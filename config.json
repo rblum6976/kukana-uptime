@@ -1,0 +1,67 @@
+{
+  "intervalSeconds": 10,
+  "groups": [
+    {
+      "name": "Public Services",
+      "targets": [
+        {
+          "name": "Google",
+          "type": "http",
+          "url": "https://www.google.com"
+        },
+        {
+          "name": "GitHub",
+          "type": "http",
+          "url": "https://github.com"
+        }
+      ]
+    },
+    {
+      "name": "Local Network",
+      "targets": [
+        {
+          "name": "Router",
+          "type": "tcp",
+          "host": "192.168.4.1",
+          "port": 80
+        },
+        {
+          "name": "NAS",
+          "type": "tcp",
+          "host": "192.168.4.50",
+          "port": 445
+        }
+      ]
+    },
+    {
+      "name": "My Sites",
+      "targets": [
+        {
+          "name": "Kauai Oceanfront Property Web Site",
+          "type": "http",
+          "url": "https://www.kauaioceanfrontproperty.com"
+        },
+        {
+          "name": "Kauai Oceanfront Property Calendar",
+          "type": "http",
+          "url": "https://calendar.kukana.app"
+        },
+        {
+          "name": "Banzai Soccer",
+          "type": "http",
+          "url": "https://www.banzai.soccer"
+        },
+        {
+          "name": "Banzai Kauai",
+          "type": "http",
+          "url": "https://www.banzai-kauai.com"
+        },
+        {
+          "name": "TNum Server",
+          "type": "http",
+          "url": "https://tnum.kokeanu.com"
+        }
+      ]
+    }
+  ]
+}

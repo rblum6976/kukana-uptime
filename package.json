@@ -1,0 +1,20 @@
+{
+  "name": "kukana-uptime",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "build:docker": "docker build --build-arg  APP_VERSION=$npm_package_version -t kukana-uptime:$(node -p \"require('./package.json').version\") -t kukana-uptime:latest .",
+    "start:docker": "docker run -p 3333:3000 -e PORT=3000 -e CONFIG=/app/config.json -v $(pwd)/config.json:/app/config.json:rw kukana-uptime:$npm_package_version"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
