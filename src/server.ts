@@ -62,7 +62,7 @@ app.post("/api/config", (req, res) => {
 });
 
 // Serve frontend
-app.use(express.static(path.join(__dirname, "../web")));
+app.use(express.static(path.join(__dirname, "../web/dist")));
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
