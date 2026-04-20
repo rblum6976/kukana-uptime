@@ -3,33 +3,90 @@ import { useEffect, useState } from "react";
 function Sparkline({ points }) {
     const width = 120;
     const height = 30;
+    const [hoverPoint, setHoverPoint] = useState(null);
 
     if (!points || points.length < 2) {
-        return <div>—</div>;
+        return <div style={{ height: "30px", display: "flex", alignItems: "center" }}>—</div>;
     }
 
     const maxLatency = Math.max(...points.map((p) => p.latency || 0), 1);
 
-    const path = points
-        .map((p, i) => {
-            const x = (i / (points.length - 1)) * width;
-            const y = height - ((p.latency || 0) / maxLatency) * height;
+    const segments = [];
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const x1 = (i / (points.length - 1)) * width;
+        const y1 = height - ((p1.latency || 0) / maxLatency) * height;
+        const x2 = ((i + 1) / (points.length - 1)) * width;
+        const y2 = height - ((p2.latency || 0) / maxLatency) * height;
 
-            return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-        })
-        .join(" ");
+        segments.push({
+            x1, y1, x2, y2,
+            color: p2.up ? "#22c55e" : "#ef4444",
+            point: p2
+        });
+    }
 
     return (
-        <svg width={width} height={height}>
-            <path d={path} stroke="#22c55e" fill="none" strokeWidth={2} />
-        </svg>
+        <div style={{ position: "relative" }}>
+            <svg
+                width={width}
+                height={height}
+                onMouseLeave={() => setHoverPoint(null)}
+                style={{ overflow: "visible" }}
+            >
+                {segments.map((s, i) => (
+                    <line
+                        key={i}
+                        x1={s.x1}
+                        y1={s.y1}
+                        x2={s.x2}
+                        y2={s.y2}
+                        stroke={s.color}
+                        strokeWidth={2}
+                        onMouseEnter={() => setHoverPoint(s.point)}
+                    />
+                ))}
+                {segments.map((s, i) => (
+                    <circle
+                        key={`c-${i}`}
+                        cx={s.x2}
+                        cy={s.y2}
+                        r={3}
+                        fill="transparent"
+                        onMouseEnter={() => setHoverPoint(s.point)}
+                    />
+                ))}
+            </svg>
+            {hoverPoint && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "-40px",
+                        left: "0",
+                        background: "#1e293b",
+                        padding: "4px 8px",
+                        borderRadius: "4px",
+                        fontSize: "10px",
+                        whiteSpace: "nowrap",
+                        zIndex: 10,
+                        border: "1px solid #334155",
+                        boxShadow: "0 4px 6px rgba(0,0,0,0.3)"
+                    }}
+                >
+                    {new Date(hoverPoint.time).toLocaleTimeString()} - {hoverPoint.latency ?? "N/A"}ms
+                </div>
+            )}
+        </div>
     );
 }
 
 function StatusCard({ item, history }) {
     const bg = item.up ? "#052e16" : "#3f0d0d";
     const color = item.up ? "#22c55e" : "#ef4444";
-    const points = history[`${item.group}::${item.name}`] || [];
+    const historyItem = history[`${item.group}::${item.name}`];
+    const points = historyItem?.points || [];
+    const uptime = historyItem?.uptime ?? 100;
 
     return (
         <div
@@ -42,7 +99,12 @@ function StatusCard({ item, history }) {
                 gap: "6px",
             }}
         >
-            <div style={{ fontWeight: "bold" }}>{item.name}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                <div style={{ fontWeight: "bold" }}>{item.name}</div>
+                <div style={{ fontSize: "10px", background: "#1e293b", padding: "2px 6px", borderRadius: "10px" }}>
+                    {uptime}% uptime
+                </div>
+            </div>
             <div style={{ color }}>{item.up ? "● UP" : "● DOWN"}</div>
             <div style={{ fontSize: "12px" }}>Latency: {item.latency ?? "N/A"} ms</div>
             <Sparkline points={points} />
@@ -113,6 +175,7 @@ export function App() {
     const [message, setMessage] = useState("");
     const [errors, setErrors] = useState({});
     const [history, setHistory] = useState([]);
+    const [collapsed, setCollapsed] = useState({});
 
     async function fetchStatus() {
         const res = await fetch("/api/status");
@@ -165,7 +228,7 @@ export function App() {
 
     const historyMap = {};
     history.forEach((h) => {
-        historyMap[`${h.group}::${h.name}`] = h.points;
+        historyMap[`${h.group}::${h.name}`] = h;
     });
 
     function validate(cfg) {
@@ -220,6 +283,30 @@ export function App() {
         updateConfig(c);
     }
 
+    function moveTarget(gi, ti, direction) {
+        const c = { ...config };
+        const targets = c.groups[gi].targets;
+        const newIndex = ti + direction;
+
+        if (newIndex < 0 || newIndex >= targets.length) return;
+
+        const [moved] = targets.splice(ti, 1);
+        targets.splice(newIndex, 0, moved);
+        updateConfig(c);
+    }
+
+    function moveGroup(gi, direction) {
+        const c = { ...config };
+        const groups = c.groups;
+        const newIndex = gi + direction;
+
+        if (newIndex < 0 || newIndex >= groups.length) return;
+
+        const [moved] = groups.splice(gi, 1);
+        groups.splice(newIndex, 0, moved);
+        updateConfig(c);
+    }
+
     async function saveConfig() {
         if (!validate(config)) {
             setMessage("❌ Fix errors before saving");
@@ -236,10 +323,18 @@ export function App() {
             if (!res.ok) throw new Error();
 
             setMessage("✅ Saved");
+            setTimeout(() => setMessage(""), 3000);
             fetchStatus();
         } catch {
             setMessage("❌ Save failed");
         }
+    }
+
+    function toggleCollapse(gi) {
+        setCollapsed(prev => ({
+            ...prev,
+            [gi]: !prev[gi]
+        }));
     }
 
     if (!config) {
@@ -367,113 +462,183 @@ export function App() {
                     <div style={{ marginBottom: "16px", color: "#94a3b8", fontSize: "14px" }}>
                         Update groups and targets, then save to apply changes.
                     </div>
-                    {config.groups.map((g, gi) => (
-                        <div
-                            key={gi}
-                            style={{
-                                marginBottom: "18px",
-                                padding: "14px",
-                                borderRadius: "12px",
-                                border: "1px solid #334155",
-                                background: "#111827",
-                            }}
-                        >
-                            <div style={{ marginBottom: "8px", fontSize: "13px", color: "#94a3b8" }}>
-                                Group
-                            </div>
-                            <input
-                                value={g.name}
-                                placeholder="Group name"
-                                style={fieldStyle(`group-${gi}-name`)}
-                                onChange={(e) => updateGroupName(gi, e.target.value)}
-                            />
-                            {errorText(`group-${gi}-name`)}
-
-                            {g.targets.map((t, ti) => (
+                    {config.groups.map((g, gi) => {
+                        const isCollapsed = collapsed[gi] ?? true;
+                        return (
+                            <div
+                                key={gi}
+                                style={{
+                                    marginBottom: "18px",
+                                    padding: "14px",
+                                    borderRadius: "12px",
+                                    border: "1px solid #334155",
+                                    background: "#111827",
+                                }}
+                            >
                                 <div
-                                    key={ti}
                                     style={{
-                                        marginTop: "12px",
-                                        padding: "12px",
-                                        borderRadius: "10px",
-                                        border: "1px solid #334155",
-                                        background: "#0f172a",
                                         display: "flex",
-                                        flexDirection: "column",
-                                        gap: "8px",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        cursor: "pointer",
+                                        userSelect: "none"
                                     }}
+                                    onClick={() => toggleCollapse(gi)}
                                 >
-                                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>Target</div>
-                                    <input
-                                        placeholder="Name"
-                                        value={t.name}
-                                        style={fieldStyle(`g-${gi}-t-${ti}-name`)}
-                                        onChange={(e) => updateTarget(gi, ti, "name", e.target.value)}
-                                    />
-                                    {errorText(`g-${gi}-t-${ti}-name`)}
-
-                                    <select
-                                        value={t.type}
-                                        style={inputBaseStyle}
-                                        onChange={(e) => updateTarget(gi, ti, "type", e.target.value)}
-                                    >
-                                        <option value="http">HTTP</option>
-                                        <option value="tcp">TCP</option>
-                                    </select>
-
-                                    {t.type === "http" && (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                            <input
-                                                placeholder="URL"
-                                                value={t.url || ""}
-                                                style={fieldStyle(`g-${gi}-t-${ti}-url`)}
-                                                onChange={(e) => updateTarget(gi, ti, "url", e.target.value)}
-                                            />
-                                            {errorText(`g-${gi}-t-${ti}-url`)}
+                                    <div style={{ fontSize: "16px", fontWeight: "bold", color: "#e5e7eb" }}>
+                                        {isCollapsed ? "▶" : "▼"} {g.name || "Unnamed Group"}
+                                    </div>
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                        <div style={{ display: "flex", gap: "6px" }}>
+                                            <button
+                                                style={{ ...actionButtonStyle, padding: "2px 8px" }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    moveGroup(gi, -1);
+                                                }}
+                                                disabled={gi === 0}
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                style={{ ...actionButtonStyle, padding: "2px 8px" }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    moveGroup(gi, 1);
+                                                }}
+                                                disabled={gi === config.groups.length - 1}
+                                            >
+                                                ↓
+                                            </button>
                                         </div>
-                                    )}
-
-                                    {t.type === "tcp" && (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                            <input
-                                                placeholder="Host"
-                                                value={t.host || ""}
-                                                style={fieldStyle(`g-${gi}-t-${ti}-host`)}
-                                                onChange={(e) => updateTarget(gi, ti, "host", e.target.value)}
-                                            />
-                                            {errorText(`g-${gi}-t-${ti}-host`)}
-
-                                            <input
-                                                placeholder="Port"
-                                                type="number"
-                                                value={t.port || ""}
-                                                style={fieldStyle(`g-${gi}-t-${ti}-port`)}
-                                                onChange={(e) =>
-                                                    updateTarget(gi, ti, "port", Number(e.target.value))
-                                                }
-                                            />
-                                            {errorText(`g-${gi}-t-${ti}-port`)}
-                                        </div>
-                                    )}
-
-                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <button style={dangerButtonStyle} onClick={() => removeTarget(gi, ti)}>
-                                            Delete Target
+                                        <button
+                                            style={dangerButtonStyle}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeGroup(gi);
+                                            }}
+                                        >
+                                            Delete Group
                                         </button>
                                     </div>
                                 </div>
-                            ))}
 
-                            <div style={{ marginTop: "12px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                                <button style={actionButtonStyle} onClick={() => addTarget(gi)}>
-                                    Add Target
-                                </button>
-                                <button style={dangerButtonStyle} onClick={() => removeGroup(gi)}>
-                                    Delete Group
-                                </button>
+                                {!isCollapsed && (
+                                    <div style={{ marginTop: "14px" }}>
+                                        <div style={{ marginBottom: "8px", fontSize: "13px", color: "#94a3b8" }}>
+                                            Group Name
+                                        </div>
+                                        <input
+                                            value={g.name}
+                                            placeholder="Group name"
+                                            style={fieldStyle(`group-${gi}-name`)}
+                                            onChange={(e) => updateGroupName(gi, e.target.value)}
+                                        />
+                                        {errorText(`group-${gi}-name`)}
+
+                                        {g.targets.map((t, ti) => (
+                                            <div
+                                                key={ti}
+                                                style={{
+                                                    marginTop: "12px",
+                                                    padding: "12px",
+                                                    borderRadius: "10px",
+                                                    border: "1px solid #334155",
+                                                    background: "#0f172a",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: "8px",
+                                                }}
+                                            >
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>Target</div>
+                                                    <div style={{ display: "flex", gap: "6px" }}>
+                                                        <button
+                                                            style={{ ...actionButtonStyle, padding: "2px 8px" }}
+                                                            onClick={() => moveTarget(gi, ti, -1)}
+                                                            disabled={ti === 0}
+                                                        >
+                                                            ↑
+                                                        </button>
+                                                        <button
+                                                            style={{ ...actionButtonStyle, padding: "2px 8px" }}
+                                                            onClick={() => moveTarget(gi, ti, 1)}
+                                                            disabled={ti === g.targets.length - 1}
+                                                        >
+                                                            ↓
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    placeholder="Name"
+                                                    value={t.name}
+                                                    style={fieldStyle(`g-${gi}-t-${ti}-name`)}
+                                                    onChange={(e) => updateTarget(gi, ti, "name", e.target.value)}
+                                                />
+                                                {errorText(`g-${gi}-t-${ti}-name`)}
+
+                                                <select
+                                                    value={t.type}
+                                                    style={inputBaseStyle}
+                                                    onChange={(e) => updateTarget(gi, ti, "type", e.target.value)}
+                                                >
+                                                    <option value="http">HTTP</option>
+                                                    <option value="tcp">TCP</option>
+                                                </select>
+
+                                                {t.type === "http" && (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                                        <input
+                                                            placeholder="URL"
+                                                            value={t.url || ""}
+                                                            style={fieldStyle(`g-${gi}-t-${ti}-url`)}
+                                                            onChange={(e) => updateTarget(gi, ti, "url", e.target.value)}
+                                                        />
+                                                        {errorText(`g-${gi}-t-${ti}-url`)}
+                                                    </div>
+                                                )}
+
+                                                {t.type === "tcp" && (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                                        <input
+                                                            placeholder="Host"
+                                                            value={t.host || ""}
+                                                            style={fieldStyle(`g-${gi}-t-${ti}-host`)}
+                                                            onChange={(e) => updateTarget(gi, ti, "host", e.target.value)}
+                                                        />
+                                                        {errorText(`g-${gi}-t-${ti}-host`)}
+
+                                                        <input
+                                                            placeholder="Port"
+                                                            type="number"
+                                                            value={t.port || ""}
+                                                            style={fieldStyle(`g-${gi}-t-${ti}-port`)}
+                                                            onChange={(e) =>
+                                                                updateTarget(gi, ti, "port", Number(e.target.value))
+                                                            }
+                                                        />
+                                                        {errorText(`g-${gi}-t-${ti}-port`)}
+                                                    </div>
+                                                )}
+
+                                                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                                    <button style={dangerButtonStyle} onClick={() => removeTarget(gi, ti)}>
+                                                        Delete Target
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div style={{ marginTop: "12px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                                            <button style={actionButtonStyle} onClick={() => addTarget(gi)}>
+                                                Add Target
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     <button style={actionButtonStyle} onClick={addGroup}>
                         Add Group
@@ -498,6 +663,12 @@ export function App() {
                             disabled={Object.keys(errors).length > 0}
                         >
                             Save Config
+                        </button>
+                        <button
+                            style={actionButtonStyle}
+                            onClick={() => setMode("dashboard")}
+                        >
+                            Back
                         </button>
                         <span style={{ color: "#cbd5e1" }}>{message}</span>
                     </div>

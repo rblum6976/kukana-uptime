@@ -2,6 +2,58 @@
   "intervalSeconds": 10,
   "groups": [
     {
+      "name": "Local Network",
+      "targets": [
+        {
+          "name": "Eero Router",
+          "type": "tcp",
+          "host": "192.168.4.1",
+          "port": 80
+        },
+        {
+          "name": "Eero Kitchen",
+          "type": "tcp",
+          "url": "",
+          "host": "192.168.4.41",
+          "port": 53
+        },
+        {
+          "name": "Eero Office",
+          "type": "tcp",
+          "url": "",
+          "host": "192.168.4.43",
+          "port": 53
+        },
+        {
+          "name": "NAS",
+          "type": "tcp",
+          "host": "192.168.4.50",
+          "port": 445
+        },
+        {
+          "name": "TNum Services",
+          "type": "tcp",
+          "url": "",
+          "host": "192.168.4.52",
+          "port": 22
+        },
+        {
+          "name": "Tnum Storage",
+          "type": "tcp",
+          "url": "",
+          "host": "192.168.4.53",
+          "port": 22
+        },
+        {
+          "name": "Dell Services",
+          "type": "tcp",
+          "url": "",
+          "host": "192.168.4.2",
+          "port": 22
+        }
+      ]
+    },
+    {
       "name": "Public Services",
       "targets": [
         {
@@ -13,23 +65,6 @@
           "name": "GitHub",
           "type": "http",
           "url": "https://github.com"
-        }
-      ]
-    },
-    {
-      "name": "Local Network",
-      "targets": [
-        {
-          "name": "Router",
-          "type": "tcp",
-          "host": "192.168.4.1",
-          "port": 80
-        },
-        {
-          "name": "NAS",
-          "type": "tcp",
-          "host": "192.168.4.50",
-          "port": 445
         }
       ]
     },
@@ -54,7 +89,7 @@
         {
           "name": "Banzai Kauai",
           "type": "http",
-          "url": "https://www.banzai-kauai.com"
+          "url": "https://banzai-kauai.com"
         },
         {
           "name": "TNum Server",
