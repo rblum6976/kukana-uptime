@@ -1,0 +1,7 @@
+node_modules
+dist
+web/dist
+history.db
+.git
+.idea
+*.log

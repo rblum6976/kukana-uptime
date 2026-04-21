@@ -9,6 +9,8 @@
     "dev:web": "vite --config web/vite.config.js",
     "start": "node dist/server.js",
     "build:docker": "docker build --build-arg  APP_VERSION=$npm_package_version -t kukana-uptime:$(node -p \"require('./package.json').version\") -t kukana-uptime:latest .",
+    "build:docker:amd64": "docker build --platform linux/amd64 --build-arg APP_VERSION=$npm_package_version -t kukana-uptime:$(node -p \"require('./package.json').version\")-amd64 -t kukana-uptime:latest-amd64 .",
+    "export:docker:amd64": "docker save kukana-uptime:$(node -p \"require('./package.json').version\")-amd64 -o kukana-uptime-$(node -p \"require('./package.json').version\")-amd64.tar",
     "start:docker": "docker run -p 3333:3000 -e PORT=3000 -e CONFIG=/app/config.json -v $(pwd)/config.json:/app/config.json:rw kukana-uptime:$npm_package_version"
   },
   "dependencies": {
