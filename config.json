@@ -1,4 +1,5 @@
 {
+  "appTitle": "Kukana - Uptime Dashboard",
   "intervalSeconds": 10,
   "groups": [
     {
@@ -8,50 +9,75 @@
           "name": "Eero Router",
           "type": "tcp",
           "host": "192.168.4.1",
-          "port": 80
+          "port": 80,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Eero Kitchen",
           "type": "tcp",
           "url": "",
           "host": "192.168.4.41",
-          "port": 53
+          "port": 53,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Eero Office",
           "type": "tcp",
           "url": "",
           "host": "192.168.4.43",
-          "port": 53
+          "port": 53,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "NAS",
           "type": "tcp",
           "host": "192.168.4.50",
-          "port": 445
+          "port": 445,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "TNum Services",
           "type": "tcp",
           "url": "",
           "host": "192.168.4.52",
-          "port": 22
+          "port": 22,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Tnum Storage",
           "type": "tcp",
           "url": "",
           "host": "192.168.4.53",
-          "port": 22
+          "port": 22,
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Dell Services",
           "type": "tcp",
           "url": "",
           "host": "192.168.4.2",
-          "port": 22
+          "port": 22,
+          "alerts": {
+            "enabled": true
+          }
         }
-      ]
+      ],
+      "alerts": {
+        "channel": "email",
+        "destination": "rblum6976@gmail.com"
+      }
     },
     {
       "name": "Public Services",
@@ -59,12 +85,18 @@
         {
           "name": "Google",
           "type": "http",
-          "url": "https://www.google.com"
+          "url": "https://www.google.com",
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "GitHub",
           "type": "http",
-          "url": "https://github.com"
+          "url": "https://github.com",
+          "alerts": {
+            "enabled": true
+          }
         }
       ]
     },
@@ -74,29 +106,48 @@
         {
           "name": "Kauai Oceanfront Property Web Site",
           "type": "http",
-          "url": "https://www.kauaioceanfrontproperty.com"
+          "url": "https://www.kauaioceanfrontproperty.com",
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Kauai Oceanfront Property Calendar",
           "type": "http",
-          "url": "https://calendar.kukana.app"
+          "url": "https://calendar.kukana.app",
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Banzai Soccer",
           "type": "http",
-          "url": "https://www.banzai.soccer"
+          "url": "https://www.banzai.soccer",
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "Banzai Kauai",
           "type": "http",
-          "url": "https://banzai-kauai.com"
+          "url": "https://banzai-kauai.com",
+          "alerts": {
+            "enabled": true
+          }
         },
         {
           "name": "TNum Server",
           "type": "http",
-          "url": "https://tnum.kokeanu.com"
+          "url": "https://tnum.kokeanu.com",
+          "alerts": {
+            "enabled": true
+          }
         }
-      ]
+      ],
+      "alerts": {
+        "channel": "email",
+        "destination": "rblum6976@gmail.com"
+      }
     }
   ]
 }

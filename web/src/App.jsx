@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const APP_TITLE_FALLBACK = "Kukana - Uptime Dashboard";
+
 function Sparkline({ points }) {
     const width = 120;
     const height = 30;
@@ -118,11 +120,31 @@ function StatusCard({ item, history }) {
 function validateConfig(cfg) {
     const errs = {};
     let valid = true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\+?[0-9\s().-]{7,}$/;
 
     cfg.groups.forEach((g, gi) => {
         if (!g.name) {
             errs[`group-${gi}-name`] = "Group name required";
             valid = false;
+        }
+
+        if (g.alerts) {
+            if (!g.alerts.channel) {
+                errs[`group-${gi}-alerts-channel`] = "Alert channel required";
+                valid = false;
+            }
+
+            if (!g.alerts.destination) {
+                errs[`group-${gi}-alerts-destination`] = "Alert destination required";
+                valid = false;
+            } else if (g.alerts.channel === "email" && !emailRegex.test(g.alerts.destination)) {
+                errs[`group-${gi}-alerts-destination`] = "Invalid email";
+                valid = false;
+            } else if (g.alerts.channel === "sms" && !phoneRegex.test(g.alerts.destination)) {
+                errs[`group-${gi}-alerts-destination`] = "Invalid phone number";
+                valid = false;
+            }
         }
 
         if (!g.targets || g.targets.length === 0) {
@@ -222,6 +244,11 @@ export function App() {
         return () => clearInterval(interval);
     }, []);
 
+    useEffect(() => {
+        const appTitle = config?.appTitle?.trim() || APP_TITLE_FALLBACK;
+        document.title = appTitle;
+    }, [config?.appTitle]);
+
     if (loadError && !config) {
         return <div>{loadError}</div>;
     }
@@ -242,6 +269,12 @@ export function App() {
         validate(newConfig);
     }
 
+    function updateAppTitle(val) {
+        const c = { ...config };
+        c.appTitle = val;
+        updateConfig(c);
+    }
+
     function updateGroupName(i, val) {
         const c = { ...config };
         c.groups[i].name = val;
@@ -251,7 +284,17 @@ export function App() {
     function addGroup() {
         updateConfig({
             ...config,
-            groups: [...config.groups, { name: "", targets: [] }],
+            groups: [
+                ...config.groups,
+                {
+                    name: "",
+                    alerts: {
+                        channel: "email",
+                        destination: "",
+                    },
+                    targets: [],
+                },
+            ],
         });
     }
 
@@ -267,6 +310,9 @@ export function App() {
             name: "",
             type: "http",
             url: "",
+            alerts: {
+                enabled: true,
+            },
         });
         updateConfig(c);
     }
@@ -280,6 +326,20 @@ export function App() {
     function updateTarget(gi, ti, field, value) {
         const c = { ...config };
         c.groups[gi].targets[ti][field] = value;
+        updateConfig(c);
+    }
+
+    function updateGroupAlerts(gi, field, value) {
+        const c = { ...config };
+        c.groups[gi].alerts = c.groups[gi].alerts || { channel: "email", destination: "" };
+        c.groups[gi].alerts[field] = value;
+        updateConfig(c);
+    }
+
+    function updateTargetAlerts(gi, ti, enabled) {
+        const c = { ...config };
+        c.groups[gi].targets[ti].alerts = c.groups[gi].targets[ti].alerts || { enabled: true };
+        c.groups[gi].targets[ti].alerts.enabled = enabled;
         updateConfig(c);
     }
 
@@ -419,7 +479,7 @@ export function App() {
                     flexWrap: "wrap",
                 }}
             >
-                <h1 style={{ margin: 0 }}>Kukana - Uptime Dashboard</h1>
+                <h1 style={{ margin: 0 }}>{config.appTitle || APP_TITLE_FALLBACK}</h1>
                 <button
                     style={modeButtonStyle}
                     onClick={() => setMode(mode === "dashboard" ? "config" : "dashboard")}
@@ -460,7 +520,16 @@ export function App() {
                     }}
                 >
                     <div style={{ marginBottom: "16px", color: "#94a3b8", fontSize: "14px" }}>
-                        Update groups and targets, then save to apply changes.
+                        Update app title, groups, and targets, then save to apply changes.
+                    </div>
+                    <div style={{ marginBottom: "16px" }}>
+                        <div style={{ marginBottom: "8px", fontSize: "13px", color: "#94a3b8" }}>App Title</div>
+                        <input
+                            value={config.appTitle || ""}
+                            placeholder={APP_TITLE_FALLBACK}
+                            style={{ ...inputBaseStyle, width: "100%", maxWidth: "520px" }}
+                            onChange={(e) => updateAppTitle(e.target.value)}
+                        />
                     </div>
                     {config.groups.map((g, gi) => {
                         const isCollapsed = collapsed[gi] ?? true;
@@ -536,7 +605,26 @@ export function App() {
                                         />
                                         {errorText(`group-${gi}-name`)}
 
-                                        {g.targets.map((t, ti) => (
+                            <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                <select
+                                    value={g.alerts?.channel || "email"}
+                                    style={fieldStyle(`group-${gi}-alerts-channel`)}
+                                    onChange={(e) => updateGroupAlerts(gi, "channel", e.target.value)}
+                                >
+                                    <option value="email">Email Alerts</option>
+                                    <option value="sms">SMS Alerts</option>
+                                </select>
+                                <input
+                                    value={g.alerts?.destination || ""}
+                                    placeholder={g.alerts?.channel === "sms" ? "Phone number" : "Email address"}
+                                    style={{ ...fieldStyle(`group-${gi}-alerts-destination`), minWidth: "260px" }}
+                                    onChange={(e) => updateGroupAlerts(gi, "destination", e.target.value)}
+                                />
+                            </div>
+                            {errorText(`group-${gi}-alerts-channel`)}
+                            {errorText(`group-${gi}-alerts-destination`)}
+
+                            {g.targets.map((t, ti) => (
                                             <div
                                                 key={ti}
                                                 style={{
@@ -585,6 +673,23 @@ export function App() {
                                                     <option value="http">HTTP</option>
                                                     <option value="tcp">TCP</option>
                                                 </select>
+
+                                                <label
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "8px",
+                                                        fontSize: "12px",
+                                                        color: "#cbd5e1",
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={t.alerts?.enabled !== false}
+                                                        onChange={(e) => updateTargetAlerts(gi, ti, e.target.checked)}
+                                                    />
+                                                    Alerts enabled for this target
+                                                </label>
 
                                                 {t.type === "http" && (
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
