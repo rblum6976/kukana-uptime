@@ -1,6 +1,6 @@
 {
   "name": "kukana-uptime",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
     "prestart": "npm run build:server",
@@ -12,7 +12,7 @@
     "build:docker": "docker build --build-arg  APP_VERSION=$npm_package_version -t kukana-uptime:$(node -p \"require('./package.json').version\") -t kukana-uptime:latest .",
     "build:docker:amd64": "docker build --platform linux/amd64 --build-arg APP_VERSION=$npm_package_version -t kukana-uptime:$(node -p \"require('./package.json').version\")-amd64 -t kukana-uptime:latest-amd64 .",
     "export:docker:amd64": "docker save kukana-uptime:$(node -p \"require('./package.json').version\")-amd64 -o kukana-uptime-$(node -p \"require('./package.json').version\")-amd64.tar",
-    "start:docker": "docker run --env-file .env -p 3333:3000 -e PORT=3000 -e CONFIG=/app/config.json -v $(pwd)/config.json:/app/config.json:rw kukana-uptime:$npm_package_version"
+    "start:docker": "docker run --env-file .env -p 3333:3000 -e PORT=3000 -v $(pwd)/data:/app/data kukana-uptime:$npm_package_version"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
+    "@types/nodemailer": "^6.4.17",
     "@types/node": "^20.0.0",
     "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.0.0",

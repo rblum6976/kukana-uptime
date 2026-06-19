@@ -1,13 +1,18 @@
 import Database from "better-sqlite3";
+import fs from "fs";
+import path from "path";
 
-const db = new Database("./history.db");
+const dbPath = process.env.DB_PATH || "./data/uptime.db";
+fs.mkdirSync(path.dirname(path.resolve(dbPath)), { recursive: true });
+
+const db = new Database(path.resolve(dbPath));
 
 const DEFAULT_SET_ID = "default";
 
 // Initialize DB schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS service_history (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     config_set TEXT NOT NULL DEFAULT 'default',
     name TEXT NOT NULL,
     group_name TEXT NOT NULL,

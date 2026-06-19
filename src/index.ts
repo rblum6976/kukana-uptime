@@ -1,17 +1,8 @@
-import fs from "fs";
-import path from "path";
 import { checkTarget } from "./checker";
-import { Config } from "./types";
-
-const configPath = process.env.CONFIG || "./config.json";
-
-function loadConfig(): Config {
-    const raw = fs.readFileSync(path.resolve(configPath), "utf-8");
-    return JSON.parse(raw);
-}
+import { getConfig } from "./config";
 
 async function run() {
-    const config = loadConfig();
+    const config = getConfig();
 
     console.log(`Starting uptime checker (Ver. ${process.env.APP_VERSION})...`);
 

@@ -1,10 +1,10 @@
 import chokidar from "chokidar";
 import { load, setConfigStore } from "./config";
 
-const configPath = process.env.CONFIG || "./config.json";
+const dbPath = process.env.DB_PATH || "./data/uptime.db";
 
 export function watchConfig(onChange?: () => void) {
-    const watcher = chokidar.watch(configPath, {
+    const watcher = chokidar.watch(dbPath, {
         ignoreInitial: true,
     });
 

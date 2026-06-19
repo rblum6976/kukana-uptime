@@ -1,12 +1,35 @@
 import fs from "fs";
 import path from "path";
+import Database from "better-sqlite3";
 import { Config, ConfigSet, ConfigSetMeta, ConfigStore } from "./types";
 
-const configPath = process.env.CONFIG || "./config.json";
+const dbPath = process.env.DB_PATH || "./data/uptime.db";
 
 const DEFAULT_SET_ID = "default";
 
-let configStore: ConfigStore = load();
+fs.mkdirSync(path.dirname(path.resolve(dbPath)), { recursive: true });
+
+const db = new Database(path.resolve(dbPath));
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS config_sets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`);
+
+const selectSetsStmt = db.prepare("SELECT id, name, config_json FROM config_sets ORDER BY rowid ASC");
+const insertSetStmt = db.prepare(
+    "INSERT INTO config_sets (id, name, config_json, updated_at) VALUES (?, ?, ?, ?)",
+);
+const updateSetNameStmt = db.prepare("UPDATE config_sets SET name = ?, updated_at = ? WHERE id = ?");
+const updateSetConfigStmt = db.prepare("UPDATE config_sets SET config_json = ?, updated_at = ? WHERE id = ?");
+const deleteSetStmt = db.prepare("DELETE FROM config_sets WHERE id = ?");
+const clearSetsStmt = db.prepare("DELETE FROM config_sets");
+
+let configStore: ConfigStore;
 
 function createDefaultConfig(name?: string): Config {
     const appTitle = typeof name === "string" && name.trim() ? `${name.trim()} - Uptime Dashboard` : "Kukana - Uptime Dashboard";
@@ -117,14 +140,52 @@ function normalizeStore(rawStore: any): ConfigStore {
     return { sets };
 }
 
-function saveStore() {
-    fs.writeFileSync(path.resolve(configPath), JSON.stringify(configStore, null, 2));
+function persistStoreToDb(store: ConfigStore) {
+    const now = Date.now();
+    const insertMany = db.transaction((sets: ConfigSet[]) => {
+        clearSetsStmt.run();
+        for (const set of sets) {
+            insertSetStmt.run(set.id, set.name, JSON.stringify(set.config), now);
+        }
+    });
+
+    insertMany(store.sets);
+}
+
+function readStoreFromDb(): ConfigStore {
+    const rows = selectSetsStmt.all() as { id: string; name: string; config_json: string }[];
+    return normalizeStore({
+        sets: rows.map((row) => {
+            let parsedConfig: any = {};
+            try {
+                parsedConfig = JSON.parse(row.config_json);
+            } catch {
+                parsedConfig = {};
+            }
+            return {
+                id: row.id,
+                name: row.name,
+                config: parsedConfig,
+            };
+        }),
+    });
 }
 
 export function load(): ConfigStore {
-    const raw = fs.readFileSync(path.resolve(configPath), "utf-8");
-    return normalizeStore(JSON.parse(raw));
+    const dbStore = readStoreFromDb();
+    if (dbStore.sets.length > 0) {
+        configStore = dbStore;
+        return dbStore;
+    }
+
+    const initialStore = normalizeStore(undefined);
+
+    persistStoreToDb(initialStore);
+    configStore = initialStore;
+    return initialStore;
 }
+
+configStore = load();
 
 export function getConfig(): Config {
     return getConfigBySetId(DEFAULT_SET_ID);
@@ -151,18 +212,17 @@ export function addConfigSet(name: string, requestedId?: string): ConfigSetMeta 
     const id = ensureUniqueId(requestedId || name || "set", used);
     const displayName = typeof name === "string" && name.trim() ? name.trim() : `Set ${configStore.sets.length + 1}`;
 
-    configStore = {
-        sets: [
-            ...configStore.sets,
-            {
-                id,
-                name: displayName,
-                config: createDefaultConfig(displayName),
-            },
-        ],
+    const newSet: ConfigSet = {
+        id,
+        name: displayName,
+        config: createDefaultConfig(displayName),
     };
 
-    saveStore();
+    configStore = {
+        sets: [...configStore.sets, newSet],
+    };
+
+    insertSetStmt.run(newSet.id, newSet.name, JSON.stringify(newSet.config), Date.now());
     return { id, name: displayName };
 }
 
@@ -174,25 +234,22 @@ export function updateConfigSetName(setId: string, name: string): ConfigSetMeta 
 
     let updatedSet: ConfigSetMeta | null = null;
 
-    configStore = {
-        sets: configStore.sets.map((entry) => {
-            if (entry.id !== setId) {
-                return entry;
-            }
+    const existing = configStore.sets.find((entry) => entry.id === setId);
+    if (!existing) {
+        throw new Error(`Unknown config set: ${setId}`);
+    }
 
-            updatedSet = { id: entry.id, name: trimmedName };
-            return {
-                ...entry,
-                name: trimmedName,
-            };
-        }),
+    configStore = {
+        sets: configStore.sets.map((entry) => (entry.id === setId ? { ...entry, name: trimmedName } : entry)),
     };
+
+    updatedSet = { id: existing.id, name: trimmedName };
+    updateSetNameStmt.run(trimmedName, Date.now(), setId);
 
     if (!updatedSet) {
         throw new Error(`Unknown config set: ${setId}`);
     }
 
-    saveStore();
     return updatedSet;
 }
 
@@ -209,7 +266,7 @@ export function deleteConfigSet(setId: string) {
         sets: configStore.sets.filter((entry) => entry.id !== setId),
     };
 
-    saveStore();
+    deleteSetStmt.run(setId);
 }
 
 export function setConfigBySetId(setId: string, newConfig: Config) {
@@ -233,7 +290,7 @@ export function setConfigBySetId(setId: string, newConfig: Config) {
         throw new Error(`Unknown config set: ${setId}`);
     }
 
-    saveStore();
+    updateSetConfigStmt.run(JSON.stringify(normalizedConfig), Date.now(), setId);
 }
 
 export function setConfig(newConfig: Config) {
@@ -241,5 +298,7 @@ export function setConfig(newConfig: Config) {
 }
 
 export function setConfigStore(newStore: ConfigStore) {
-    configStore = normalizeStore(newStore);
+    const normalized = normalizeStore(newStore);
+    persistStoreToDb(normalized);
+    configStore = normalized;
 }

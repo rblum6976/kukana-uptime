@@ -5,7 +5,7 @@ Simple uptime monitoring app with:
 - **Node.js + TypeScript backend** (Express API + scheduler)
 - **React frontend** (built with Vite)
 - **Config-driven checks** for `http` and `tcp` targets
-- **Runtime config reload** with file watching
+- **SQLite-backed persistence** for status/history and configuration sets
 
 ## Features
 
@@ -24,10 +24,10 @@ Simple uptime monitoring app with:
 ## Project Structure
 
 ```text
-src/            # backend (API, scheduler, checker, state)
+src/            # backend (API, scheduler, checker, state, config store)
 web/src/        # React app source
 web/dist/       # built frontend assets
-config.json     # monitor configuration
+data/uptime.db  # sqlite database (status/history + configuration sets)
 dist/           # compiled backend output
 ```
 
@@ -90,62 +90,16 @@ Server port is configured with `.env` (`PORT`, default in this repo: `3005`).
 
 App runtime settings are centralized in `.env`:
 
-- Backend: `PORT`, `CONFIG`, `ALERT_FROM_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
+- Backend: `PORT`, `DB_PATH`, `ALERT_FROM_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
 - Frontend (Vite): `VITE_DEV_HOST`, `VITE_DEV_PORT`, `VITE_API_PROXY_TARGET`
 - Docker/cloudflared: `TUNNEL_TOKEN`
 
-Config path is `./config.json` by default.
-
-You can override with environment variable:
+`DB_PATH` defaults to `./data/uptime.db` and stores configuration sets plus monitoring history.
+To load exported sets directly into SQLite, use the seed script:
 
 ```bash
-CONFIG=/path/to/config.json npm start
+sqlite3 ./data/uptime.db < ./data/config_sets_seed.sql
 ```
-
-Example config:
-
-```json
-{
-  "appTitle": "Kukana - Uptime Dashboard",
-  "intervalSeconds": 30,
-  "groups": [
-    {
-      "name": "Web",
-      "alerts": {
-        "channel": "email",
-        "destination": "oncall@example.com",
-        "downAfterMinutes": 1,
-        "downAfterChecks": 2,
-        "repeatDownEveryMinutes": 15
-      },
-      "targets": [
-        {
-          "name": "Main Site",
-          "type": "http",
-          "url": "https://example.com",
-          "alerts": {
-            "enabled": true
-          }
-        }
-      ]
-    },
-    {
-      "name": "Infra",
-      "targets": [
-        {
-          "name": "Redis",
-          "type": "tcp",
-          "host": "127.0.0.1",
-          "port": 6379
-        }
-      ]
-    }
-  ]
-}
-```
-
-- `appTitle` controls the dashboard heading and browser tab title.
-- If `appTitle` is omitted or blank, the app uses `Kukana - Uptime Dashboard`.
 
 ### Alerting behavior
 
