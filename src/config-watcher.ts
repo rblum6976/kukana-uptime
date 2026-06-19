@@ -1,5 +1,5 @@
 import chokidar from "chokidar";
-import { load, setConfig } from "./config";
+import { load, setConfigStore } from "./config";
 
 const configPath = process.env.CONFIG || "./config.json";
 
@@ -10,8 +10,8 @@ export function watchConfig(onChange?: () => void) {
 
     watcher.on("change", () => {
         try {
-            const newConfig = load();
-            setConfig(newConfig);
+            const newStore = load();
+            setConfigStore(newStore);
 
             console.log("📄 Config reloaded");
 

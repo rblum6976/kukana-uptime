@@ -42,6 +42,12 @@ dist/           # compiled backend output
 npm install
 ```
 
+Create central app environment file:
+
+```bash
+cp .env.example .env
+```
+
 ## Run in Development
 
 Use two terminals:
@@ -59,7 +65,7 @@ npm start
 npm run dev:web
 ```
 
-Frontend runs on `http://127.0.0.1:5175` and proxies `/api` to `http://127.0.0.1:3000`.
+Frontend host/port/proxy are configured via `.env` (`VITE_DEV_HOST`, `VITE_DEV_PORT`, `VITE_API_PROXY_TARGET`).
 
 ## Production Build
 
@@ -78,9 +84,15 @@ Then start the app:
 npm start
 ```
 
-Server default port is `3000`.
+Server port is configured with `.env` (`PORT`, default in this repo: `3005`).
 
 ## Configuration
+
+App runtime settings are centralized in `.env`:
+
+- Backend: `PORT`, `CONFIG`, `ALERT_FROM_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
+- Frontend (Vite): `VITE_DEV_HOST`, `VITE_DEV_PORT`, `VITE_API_PROXY_TARGET`
+- Docker/cloudflared: `TUNNEL_TOKEN`
 
 Config path is `./config.json` by default.
 
@@ -101,7 +113,10 @@ Example config:
       "name": "Web",
       "alerts": {
         "channel": "email",
-        "destination": "oncall@example.com"
+        "destination": "oncall@example.com",
+        "downAfterMinutes": 1,
+        "downAfterChecks": 2,
+        "repeatDownEveryMinutes": 15
       },
       "targets": [
         {
@@ -136,13 +151,21 @@ Example config:
 
 - Alerts are configured at **group** level (`alerts.channel` + `alerts.destination`).
 - Each **target** can enable/disable alerts with `target.alerts.enabled` (defaults to `true`).
-- Alerts are sent on status transitions only (`UP -> DOWN` and `DOWN -> UP`).
-- `email` alerts are implemented as a starter logger pipeline (ready for SMTP provider wiring).
+- A `DOWN` alert is sent only when at least one configured threshold is met:
+  - `alerts.downAfterMinutes`: send after target has been continuously down for this duration.
+  - `alerts.downAfterChecks`: send after this many consecutive failed checks.
+- If both thresholds are set, the alert triggers when either threshold is reached.
+- Repeated `DOWN` alerts are rate-limited by `alerts.repeatDownEveryMinutes` (default: `30`).
+- `UP` recovery alerts are sent once when the target comes back online after an alerted outage, including total downtime.
 - `sms` is available in config/UI as a placeholder channel for future provider integration.
 
 ### Alerting environment variables
 
 - `ALERT_FROM_EMAIL` (optional): sender used by email alerts, default is `kukana-uptime@localhost`.
+- `SMTP_HOST`: SMTP server host for email delivery (required for real email sending).
+- `SMTP_PORT`: SMTP server port (required for real email sending).
+- `SMTP_SECURE` (optional): set to `true` for SMTPS/TLS ports.
+- `SMTP_USER` / `SMTP_PASS` (optional): SMTP authentication credentials.
 
 ## API Endpoints
 
@@ -165,7 +188,12 @@ Run container:
 npm run start:docker
 ```
 
+`docker-compose.yml` loads shared variables from `.env`.
+
 Maps:
 
 - Container `3000` -> Host `3333`
 - Local `config.json` mounted into container
+- With `docker-compose.yml`, Mailpit is included for local email testing:
+  - App SMTP points to `mailpit:1025`
+  - Mailpit UI is exposed on `http://localhost:8025`

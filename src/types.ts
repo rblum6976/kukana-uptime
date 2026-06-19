@@ -14,6 +14,9 @@ export type GroupAlertChannel = "email" | "sms";
 export type GroupAlerts = {
     channel: GroupAlertChannel;
     destination: string;
+    downAfterMinutes?: number;
+    downAfterChecks?: number;
+    repeatDownEveryMinutes?: number;
 };
 
 export type Group = {
@@ -27,3 +30,18 @@ export interface Config {
     intervalSeconds: number;
     groups: Group[];
 }
+
+export type ConfigSet = {
+    id: string;
+    name: string;
+    config: Config;
+};
+
+export type ConfigSetMeta = {
+    id: string;
+    name: string;
+};
+
+export type ConfigStore = {
+    sets: ConfigSet[];
+};

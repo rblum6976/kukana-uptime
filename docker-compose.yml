@@ -5,12 +5,27 @@ services:
     image: kukana-uptime:1.0.0-amd64
     container_name: kukana-uptime
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3333:3000"   # adjust to whatever your app uses
     volumes:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
+      - PORT=3000
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - ALERT_FROM_EMAIL=uptime@kukana.local
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -19,5 +34,7 @@ services:
     command: tunnel run
     depends_on:
       - kukana-uptime
+    env_file:
+      - .env
     environment:
-      - TUNNEL_TOKEN=<TUNNEL_TOKEN>
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}

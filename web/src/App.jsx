@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 
 const APP_TITLE_FALLBACK = "Kukana - Uptime Dashboard";
 
+function readSetIdFromPath() {
+    const match = window.location.pathname.match(/^\/sets\/([^/]+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+function toSetPath(setId) {
+    return `/sets/${encodeURIComponent(setId)}`;
+}
+
 function Sparkline({ points }) {
     const width = 120;
     const height = 30;
@@ -190,6 +199,18 @@ function validateConfig(cfg) {
 }
 
 export function App() {
+    const [configSets, setConfigSets] = useState([]);
+    const [newSetName, setNewSetName] = useState("");
+    const [isCreateSetDialogOpen, setIsCreateSetDialogOpen] = useState(false);
+    const [createSetError, setCreateSetError] = useState("");
+    const [isEditSetDialogOpen, setIsEditSetDialogOpen] = useState(false);
+    const [setBeingEdited, setSetBeingEdited] = useState(null);
+    const [editSetName, setEditSetName] = useState("");
+    const [editSetError, setEditSetError] = useState("");
+    const [isDeleteSetDialogOpen, setIsDeleteSetDialogOpen] = useState(false);
+    const [setBeingDeleted, setSetBeingDeleted] = useState(null);
+    const [deleteSetError, setDeleteSetError] = useState("");
+    const [activeSetId, setActiveSetId] = useState(() => readSetIdFromPath());
     const [data, setData] = useState([]);
     const [config, setConfig] = useState(null);
     const [loadError, setLoadError] = useState("");
@@ -199,8 +220,33 @@ export function App() {
     const [history, setHistory] = useState([]);
     const [collapsed, setCollapsed] = useState({});
 
+    const isIndexPage = !activeSetId;
+
+    useEffect(() => {
+        const onPopState = () => {
+            setActiveSetId(readSetIdFromPath());
+        };
+
+        window.addEventListener("popstate", onPopState);
+        return () => window.removeEventListener("popstate", onPopState);
+    }, []);
+
+    function navigateTo(path) {
+        window.history.pushState({}, "", path);
+        setActiveSetId(readSetIdFromPath());
+    }
+
+    async function fetchConfigSets() {
+        const res = await fetch("/api/config-sets");
+        if (!res.ok) {
+            throw new Error("Failed to load configuration sets");
+        }
+        setConfigSets(await res.json());
+    }
+
     async function fetchStatus() {
-        const res = await fetch("/api/status");
+        if (!activeSetId) return;
+        const res = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/status`);
         if (!res.ok) {
             throw new Error("Failed to load status");
         }
@@ -208,7 +254,8 @@ export function App() {
     }
 
     async function fetchConfig() {
-        const res = await fetch("/api/config");
+        if (!activeSetId) return;
+        const res = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/config`);
         if (!res.ok) {
             throw new Error("Failed to load config");
         }
@@ -216,7 +263,8 @@ export function App() {
     }
 
     async function fetchHistory() {
-        const res = await fetch("/api/history");
+        if (!activeSetId) return;
+        const res = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/history`);
         if (!res.ok) {
             throw new Error("Failed to load history");
         }
@@ -226,7 +274,10 @@ export function App() {
     useEffect(() => {
         async function loadInitial() {
             try {
-                await Promise.all([fetchStatus(), fetchConfig(), fetchHistory()]);
+                await fetchConfigSets();
+                if (activeSetId) {
+                    await Promise.all([fetchStatus(), fetchConfig(), fetchHistory()]);
+                }
                 setLoadError("");
             } catch {
                 setLoadError("Failed to load initial data. Ensure backend is running on port 3000.");
@@ -236,13 +287,14 @@ export function App() {
         loadInitial();
 
         const interval = setInterval(() => {
+            if (!activeSetId) return;
             Promise.all([fetchStatus(), fetchHistory()]).catch(() => {
                 // keep current UI data on polling errors
             });
         }, 5000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [activeSetId]);
 
     useEffect(() => {
         const appTitle = config?.appTitle?.trim() || APP_TITLE_FALLBACK;
@@ -368,13 +420,14 @@ export function App() {
     }
 
     async function saveConfig() {
+        if (!activeSetId) return;
         if (!validate(config)) {
             setMessage("❌ Fix errors before saving");
             return;
         }
 
         try {
-            const res = await fetch("/api/config", {
+            const res = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/config`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config),
@@ -390,6 +443,95 @@ export function App() {
         }
     }
 
+    async function createConfigSet() {
+        if (!newSetName.trim()) {
+            setCreateSetError("Enter a set name");
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/config-sets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newSetName.trim() }),
+            });
+            if (!res.ok) {
+                throw new Error();
+            }
+
+            const created = await res.json();
+            setNewSetName("");
+            setCreateSetError("");
+            setIsCreateSetDialogOpen(false);
+            await fetchConfigSets();
+            navigateTo(toSetPath(created.id));
+        } catch {
+            setCreateSetError("Failed to create configuration set");
+        }
+    }
+
+    function openEditSetDialog(set) {
+        setSetBeingEdited(set);
+        setEditSetName(set.name || "");
+        setEditSetError("");
+        setIsEditSetDialogOpen(true);
+    }
+
+    async function saveSetName() {
+        if (!setBeingEdited) return;
+        if (!editSetName.trim()) {
+            setEditSetError("Enter a set name");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/config-sets/${encodeURIComponent(setBeingEdited.id)}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: editSetName.trim() }),
+            });
+
+            if (!res.ok) {
+                throw new Error();
+            }
+
+            setIsEditSetDialogOpen(false);
+            setSetBeingEdited(null);
+            setEditSetName("");
+            setEditSetError("");
+            await fetchConfigSets();
+        } catch {
+            setEditSetError("Failed to update configuration set");
+        }
+    }
+
+    function openDeleteSetDialog(set) {
+        setSetBeingDeleted(set);
+        setDeleteSetError("");
+        setIsDeleteSetDialogOpen(true);
+    }
+
+    async function confirmDeleteSet() {
+        if (!setBeingDeleted) return;
+
+        try {
+            const res = await fetch(`/api/config-sets/${encodeURIComponent(setBeingDeleted.id)}`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                throw new Error();
+            }
+
+            setIsDeleteSetDialogOpen(false);
+            setSetBeingDeleted(null);
+            setDeleteSetError("");
+            await fetchConfigSets();
+        } catch {
+            setDeleteSetError("Failed to delete configuration set");
+        }
+    }
+
     function toggleCollapse(gi) {
         setCollapsed(prev => ({
             ...prev,
@@ -397,7 +539,7 @@ export function App() {
         }));
     }
 
-    if (!config) {
+    if (!isIndexPage && !config) {
         return <div>Loading...</div>;
     }
 
@@ -479,16 +621,296 @@ export function App() {
                     flexWrap: "wrap",
                 }}
             >
-                <h1 style={{ margin: 0 }}>{config.appTitle || APP_TITLE_FALLBACK}</h1>
-                <button
-                    style={modeButtonStyle}
-                    onClick={() => setMode(mode === "dashboard" ? "config" : "dashboard")}
-                >
-                    {mode === "dashboard" ? "Edit Config" : "Back"}
-                </button>
+                <h1 style={{ margin: 0 }}>{isIndexPage ? APP_TITLE_FALLBACK : config.appTitle || APP_TITLE_FALLBACK}</h1>
+                {!isIndexPage ? (
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                        <button style={actionButtonStyle} onClick={() => navigateTo("/")}>
+                            All Sets
+                        </button>
+                        <button
+                            style={modeButtonStyle}
+                            onClick={() => setMode(mode === "dashboard" ? "config" : "dashboard")}
+                        >
+                            {mode === "dashboard" ? "Edit Config" : "Back"}
+                        </button>
+                    </div>
+                ) : null}
             </div>
 
-            {mode === "dashboard" &&
+            {isIndexPage && (
+                <div
+                    style={{
+                        background: "#0b1224",
+                        border: "1px solid #1e293b",
+                        borderRadius: "14px",
+                        padding: "16px",
+                        display: "grid",
+                        gap: "16px",
+                    }}
+                >
+                    <div style={{ color: "#94a3b8", fontSize: "14px" }}>
+                        Select a configuration set or create a new one.
+                    </div>
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                            gap: "14px",
+                        }}
+                    >
+                        {configSets.map((set) => (
+                            <div
+                                key={set.id}
+                                style={{
+                                    background: "#082f49",
+                                    border: "1px solid #0ea5e9",
+                                    borderRadius: "12px",
+                                    padding: "14px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "6px",
+                                    textAlign: "left",
+                                    cursor: "pointer",
+                                    color: "#e0f2fe",
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => navigateTo(toSetPath(set.id))}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        navigateTo(toSetPath(set.id));
+                                    }
+                                }}
+                            >
+                                <div style={{ fontWeight: 700, fontSize: "16px" }}>{set.name}</div>
+                                <div style={{ color: "#bae6fd", fontSize: "12px" }}>{set.id}</div>
+                                <div style={{ marginTop: "6px", display: "flex", gap: "8px" }}>
+                                    <button
+                                        style={{
+                                            ...actionButtonStyle,
+                                            padding: "6px 10px",
+                                            background: "#0f172a",
+                                            color: "#cbd5e1",
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openEditSetDialog(set);
+                                        }}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        style={{
+                                            ...dangerButtonStyle,
+                                            padding: "6px 10px",
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openDeleteSetDialog(set);
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div>
+                        <button
+                            style={modeButtonStyle}
+                            onClick={() => {
+                                setCreateSetError("");
+                                setIsCreateSetDialogOpen(true);
+                            }}
+                        >
+                            Create Set
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {isIndexPage && isEditSetDialogOpen && setBeingEdited && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(2, 6, 23, 0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "20px",
+                        zIndex: 1000,
+                    }}
+                    onClick={() => {
+                        setEditSetError("");
+                        setSetBeingEdited(null);
+                        setIsEditSetDialogOpen(false);
+                    }}
+                >
+                    <div
+                        style={{
+                            width: "100%",
+                            maxWidth: "460px",
+                            background: "#0b1224",
+                            border: "1px solid #1e293b",
+                            borderRadius: "14px",
+                            padding: "16px",
+                            display: "grid",
+                            gap: "10px",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ fontSize: "16px", fontWeight: 700 }}>Edit configuration set</div>
+                        <div style={{ fontSize: "13px", color: "#94a3b8" }}>Update the set name for `{setBeingEdited.id}`.</div>
+                        <input
+                            value={editSetName}
+                            placeholder="Set name"
+                            style={inputBaseStyle}
+                            onChange={(e) => setEditSetName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    saveSetName();
+                                }
+                            }}
+                        />
+                        {editSetError ? <div style={{ color: "#ef4444", fontSize: "12px" }}>❌ {editSetError}</div> : null}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                            <button
+                                style={actionButtonStyle}
+                                onClick={() => {
+                                    setEditSetError("");
+                                    setSetBeingEdited(null);
+                                    setIsEditSetDialogOpen(false);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button style={modeButtonStyle} onClick={saveSetName}>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isIndexPage && isDeleteSetDialogOpen && setBeingDeleted && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(2, 6, 23, 0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "20px",
+                        zIndex: 1000,
+                    }}
+                    onClick={() => {
+                        setDeleteSetError("");
+                        setSetBeingDeleted(null);
+                        setIsDeleteSetDialogOpen(false);
+                    }}
+                >
+                    <div
+                        style={{
+                            width: "100%",
+                            maxWidth: "460px",
+                            background: "#0b1224",
+                            border: "1px solid #1e293b",
+                            borderRadius: "14px",
+                            padding: "16px",
+                            display: "grid",
+                            gap: "10px",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ fontSize: "16px", fontWeight: 700 }}>Delete configuration set</div>
+                        <div style={{ fontSize: "13px", color: "#94a3b8" }}>
+                            Are you sure you want to delete `{setBeingDeleted.name}`? This cannot be undone.
+                        </div>
+                        {deleteSetError ? <div style={{ color: "#ef4444", fontSize: "12px" }}>❌ {deleteSetError}</div> : null}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                            <button
+                                style={actionButtonStyle}
+                                onClick={() => {
+                                    setDeleteSetError("");
+                                    setSetBeingDeleted(null);
+                                    setIsDeleteSetDialogOpen(false);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button style={dangerButtonStyle} onClick={confirmDeleteSet}>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isIndexPage && isCreateSetDialogOpen && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(2, 6, 23, 0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "20px",
+                        zIndex: 1000,
+                    }}
+                    onClick={() => setIsCreateSetDialogOpen(false)}
+                >
+                    <div
+                        style={{
+                            width: "100%",
+                            maxWidth: "460px",
+                            background: "#0b1224",
+                            border: "1px solid #1e293b",
+                            borderRadius: "14px",
+                            padding: "16px",
+                            display: "grid",
+                            gap: "10px",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ fontSize: "16px", fontWeight: 700 }}>Create configuration set</div>
+                        <div style={{ fontSize: "13px", color: "#94a3b8" }}>
+                            Enter a name. The set ID will be generated automatically.
+                        </div>
+                        <input
+                            value={newSetName}
+                            placeholder="Set name"
+                            style={inputBaseStyle}
+                            onChange={(e) => setNewSetName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    createConfigSet();
+                                }
+                            }}
+                        />
+                        {createSetError ? <div style={{ color: "#ef4444", fontSize: "12px" }}>❌ {createSetError}</div> : null}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                            <button
+                                style={actionButtonStyle}
+                                onClick={() => {
+                                    setCreateSetError("");
+                                    setIsCreateSetDialogOpen(false);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button style={modeButtonStyle} onClick={createConfigSet}>
+                                Create Set
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {!isIndexPage && mode === "dashboard" &&
                 Object.entries(grouped).map(([groupName, items]) => (
                     <div key={groupName} style={{ marginBottom: "24px" }}>
                         <h2 style={{ marginBottom: "10px" }}>{groupName}</h2>
@@ -510,7 +932,7 @@ export function App() {
                     </div>
                 ))}
 
-            {mode === "config" && (
+            {!isIndexPage && mode === "config" && (
                 <div
                     style={{
                         background: "#0b1224",

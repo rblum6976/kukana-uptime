@@ -2,10 +2,13 @@ import Database from "better-sqlite3";
 
 const db = new Database("./history.db");
 
+const DEFAULT_SET_ID = "default";
+
 // Initialize DB schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS service_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    config_set TEXT NOT NULL DEFAULT 'default',
     name TEXT NOT NULL,
     group_name TEXT NOT NULL,
     up INTEGER NOT NULL,
@@ -13,6 +16,12 @@ db.exec(`
     time INTEGER NOT NULL
   )
 `);
+
+const columns = db.prepare("PRAGMA table_info(service_history)").all() as { name: string }[];
+const hasConfigSetColumn = columns.some((column) => column.name === "config_set");
+if (!hasConfigSetColumn) {
+    db.exec("ALTER TABLE service_history ADD COLUMN config_set TEXT NOT NULL DEFAULT 'default'");
+}
 
 type StatusPoint = {
     time: number;
@@ -29,28 +38,30 @@ type ServiceHistory = {
 
 const MAX_POINTS = 50;
 
-let currentStatus: any[] = [];
+const currentStatusBySet: Record<string, any[]> = {};
 
 const insertStmt = db.prepare(`
-    INSERT INTO service_history (name, group_name, up, latency, time)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO service_history (config_set, name, group_name, up, latency, time)
+    VALUES (?, ?, ?, ?, ?, ?)
 `);
 
-export function setStatus(status: any[]) {
-    currentStatus = status;
+export function setStatus(setId: string, status: any[]) {
+    currentStatusBySet[setId] = status;
 
     for (const item of status) {
-        insertStmt.run(item.name, item.group, item.up ? 1 : 0, item.latency, Date.now());
+        insertStmt.run(setId, item.name, item.group, item.up ? 1 : 0, item.latency, Date.now());
     }
 }
 
-export function getStatus() {
-    return currentStatus;
+export function getStatus(setId: string = DEFAULT_SET_ID) {
+    return currentStatusBySet[setId] || [];
 }
 
-export function getHistory() {
+export function getHistory(setId: string = DEFAULT_SET_ID) {
     // Get unique services
-    const services = db.prepare("SELECT DISTINCT name, group_name FROM service_history").all() as { name: string, group_name: string }[];
+    const services = db
+        .prepare("SELECT DISTINCT name, group_name FROM service_history WHERE config_set = ?")
+        .all(setId) as { name: string; group_name: string }[];
 
     const result: ServiceHistory[] = [];
 
@@ -58,10 +69,10 @@ export function getHistory() {
         const points = db.prepare(`
             SELECT time, up, latency
             FROM service_history
-            WHERE name = ? AND group_name = ?
+            WHERE config_set = ? AND name = ? AND group_name = ?
             ORDER BY time DESC
             LIMIT ?
-        `).all(service.name, service.group_name, MAX_POINTS).reverse() as { time: number, up: number, latency: number | null }[];
+        `).all(setId, service.name, service.group_name, MAX_POINTS).reverse() as { time: number, up: number, latency: number | null }[];
 
         const statusPoints: StatusPoint[] = points.map(p => ({
             time: p.time,
@@ -73,8 +84,8 @@ export function getHistory() {
         const counts = db.prepare(`
             SELECT COUNT(*) as total, SUM(up) as ups
             FROM service_history
-            WHERE name = ? AND group_name = ?
-        `).get(service.name, service.group_name) as { total: number, ups: number };
+            WHERE config_set = ? AND name = ? AND group_name = ?
+        `).get(setId, service.name, service.group_name) as { total: number, ups: number };
 
         const uptime = counts.total > 0 ? (counts.ups / counts.total) * 100 : 0;
 
