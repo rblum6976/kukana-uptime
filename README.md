@@ -142,7 +142,7 @@ Run container:
 npm run start:docker
 ```
 
-`docker-compose.yml` loads shared variables from `.env`.
+`docker-compose.yml` (local) loads shared variables from `.env`.
 
 Maps:
 
@@ -151,3 +151,133 @@ Maps:
 - With `docker-compose.yml`, Mailpit is included for local email testing:
   - App SMTP points to `mailpit:1025`
   - Mailpit UI is exposed on `http://localhost:8025`
+
+---
+
+## Production deployment (Docker + Cloudflare Tunnel + Gmail SMTP)
+
+This repository includes everything you need to deploy the app on a Docker host and expose it through a Cloudflare Tunnel. Outgoing alerts use Gmail SMTP (via a Gmail App Password).
+
+### What’s included
+
+- `.env.prod` – production environment variables preset for Gmail and Cloudflare Tunnel
+- `docker-compose.prod.yml` – production compose stack (app + persistent volume + cloudflared sidecar)
+- `scripts/deploy.sh` – one‑command build and deploy
+- `scripts/update.sh` – rebuild and recreate containers with minimal downtime
+- `scripts/logs.sh` – follow logs
+- `scripts/status.sh` – show service status
+- `scripts/down.sh` – stop the stack
+- `scripts/backup.sh` – copy a timestamped backup of the SQLite DB from the container
+
+### Prerequisites
+
+- A Linux/macOS host with Docker Engine and Docker Compose plugin installed
+- A Cloudflare account and a configured Tunnel (you’ll need a Tunnel token)
+- A Gmail account with 2‑step verification enabled and a generated Gmail App Password
+
+### 1) Configure Gmail SMTP
+
+Gmail requires an App Password when using SMTP:
+
+1. Enable 2‑step verification for your Gmail account.
+2. Create a new App Password (choose “Mail” as the app, any device).
+3. In `.env.prod`, set:
+
+```
+ALERT_FROM_EMAIL=your_gmail_address@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_PASS=the_16_character_app_password
+```
+
+### 2) Configure Cloudflare Tunnel
+
+1. Create a Tunnel in Cloudflare Zero Trust (if you don’t have one).
+2. Copy the `TUNNEL_TOKEN` for the tunnel instance you will run on the host.
+3. Paste it into `.env.prod` as `TUNNEL_TOKEN=...`.
+
+The `cloudflared` service in `docker-compose.prod.yml` will start with this token and expose the app.
+
+### 3) Adjust optional settings
+
+- `PORT=3000` is the internal app port used in production (mapped to `3333` on the host by default).
+- `DB_PATH=./data/uptime.db` controls SQLite location inside the container; a Docker volume `uptime-data` persists it.
+
+### 4) Deploy
+
+On the target host:
+
+```bash
+cd /path/to/Kukana-Uptime
+cp .env.prod .env.prod.backup-$(date +%Y%m%d-%H%M%S)   # optional backup before edits
+# Edit .env.prod and set the values described above
+
+./scripts/deploy.sh
+```
+
+What happens:
+
+- Builds the `kukana-uptime` image (if needed)
+- Starts the app and `cloudflared` defined in `docker-compose.prod.yml`
+- Creates/uses a persistent volume `uptime-data` for the database
+
+Access:
+
+- Via Cloudflare public hostname associated with your tunnel (e.g., `https://uptime.example.com`)
+- Locally on the host at `http://localhost:3333`
+
+### 5) Operations
+
+- Update and redeploy (rebuild + recreate containers):
+
+```bash
+./scripts/update.sh
+```
+
+- View logs (all services or a specific one like `kukana-uptime` or `cloudflared-uptime`):
+
+```bash
+./scripts/logs.sh              # all
+./scripts/logs.sh kukana-uptime
+./scripts/logs.sh cloudflared-uptime
+```
+
+- Show status:
+
+```bash
+./scripts/status.sh
+```
+
+- Stop the stack:
+
+```bash
+./scripts/down.sh
+```
+
+- Backup the SQLite database from the running container:
+
+```bash
+./scripts/backup.sh                 # saves to ./backups/uptime-YYYYmmdd-HHMMSS.db
+./scripts/backup.sh /mnt/backupdir  # custom directory
+```
+
+### Production environment variables
+
+The production presets live in `.env.prod` and include:
+
+- `NODE_ENV=production`
+- `APP_VERSION=1.1.0`
+- `PORT=3000`
+- `CONFIG=./config.json`
+- `DB_PATH=./data/uptime.db`
+- `ALERT_FROM_EMAIL` – sender address for alerts (set to your Gmail)
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=465`
+- `SMTP_SECURE=true`
+- `SMTP_USER` – your full Gmail address
+- `SMTP_PASS` – your Gmail App Password (16 chars)
+- `TUNNEL_TOKEN` – Cloudflare Tunnel token used by `cloudflared`
+
+Note: For development, the backend default port in code is `3005`. The production compose maps container `3000` to host `3333`.

@@ -1,4 +1,5 @@
 /node_modules/
 /dist/
 /web/dist/
-/kukana-uptime*.tar.gz
+/kukana-uptime*.tar*
+/.env*

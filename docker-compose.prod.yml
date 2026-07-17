@@ -1,0 +1,31 @@
+services:
+  kukana-uptime:
+    build:
+      context: .
+    image: kukana-uptime:${APP_VERSION:-latest}
+    container_name: kukana-uptime
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    ports:
+      - "3333:3000"   # external:internal
+    volumes:
+      - uptime-data:/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-uptime
+    restart: unless-stopped
+    command: tunnel run
+    depends_on:
+      - kukana-uptime
+    env_file:
+      - .env.prod
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+
+volumes:
+  uptime-data:
