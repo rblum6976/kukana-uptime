@@ -163,6 +163,7 @@ This repository includes everything you need to deploy the app on a Docker host 
 - `.env.prod` – production environment variables preset for Gmail and Cloudflare Tunnel
 - `docker-compose.prod.yml` – production compose stack (app + persistent volume + cloudflared sidecar)
 - `scripts/deploy.sh` – one‑command build and deploy
+- `scripts/publish.sh` – build and publish to local Docker registry
 - `scripts/update.sh` – rebuild and recreate containers with minimal downtime
 - `scripts/logs.sh` – follow logs
 - `scripts/status.sh` – show service status
@@ -228,7 +229,20 @@ Access:
 - Via Cloudflare public hostname associated with your tunnel (e.g., `https://uptime.example.com`)
 - Locally on the host at `http://localhost:3333`
 
-### 5) Operations
+### 5) Build and Publish to Registry
+
+If you have a local Docker registry (e.g., `Kukana-Registry` on `tnum-services:5000`), you can streamline updates by building and pushing from your development machine.
+
+1. Ensure `REGISTRY_URL` is set in `.env.prod`.
+2. Run the publish script:
+
+```bash
+npm run publish
+```
+
+This will build the production image, tag it for your registry, and push both the versioned tag and `latest`.
+
+### 6) Operations
 
 - Update and redeploy (rebuild + recreate containers):
 
@@ -279,5 +293,6 @@ The production presets live in `.env.prod` and include:
 - `SMTP_USER` – your full Gmail address
 - `SMTP_PASS` – your Gmail App Password (16 chars)
 - `TUNNEL_TOKEN` – Cloudflare Tunnel token used by `cloudflared`
+- `REGISTRY_URL` – local Docker registry URL (e.g., `tnum-services:5000`)
 
 Note: For development, the backend default port in code is `3005`. The production compose maps container `3000` to host `3333`.
