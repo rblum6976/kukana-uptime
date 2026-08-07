@@ -25,6 +25,8 @@ startScheduler();
 watchConfig(() => {
     refreshAlertConfiguration();
     console.log("🔄 Config updated at runtime");
+}).catch((err) => {
+    console.error("❌ Failed to start config watcher:", err);
 });
 
 app.use(express.json());

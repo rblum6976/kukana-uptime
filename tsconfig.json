@@ -5,11 +5,11 @@
     "rootDir": "src",
 
     /* Module system */
-    "module": "commonjs",
+    "module": "Node16",
     "target": "ES2020",
 
     /* Node compatibility */
-    "moduleResolution": "node",
+    "moduleResolution": "Node16",
     "esModuleInterop": true,
     "resolveJsonModule": true,
 

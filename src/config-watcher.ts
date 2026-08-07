@@ -1,4 +1,3 @@
-import chokidar from "chokidar";
 import { getConfigBySetId, getConfigSets, load } from "./config";
 
 const dbPath = process.env.DB_PATH || "./data/uptime.db";
@@ -12,7 +11,8 @@ function getConfigSnapshot() {
     );
 }
 
-export function watchConfig(onChange?: () => void) {
+export async function watchConfig(onChange?: () => void) {
+    const { default: chokidar } = await import("chokidar");
     let configSnapshot = getConfigSnapshot();
     const watcher = chokidar.watch(dbPath, {
         ignoreInitial: true,

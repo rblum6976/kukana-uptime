@@ -33,7 +33,7 @@ dist/           # compiled backend output
 
 ## Requirements
 
-- Node.js 18+ (Node 20+ recommended)
+- Node.js 22+ (Node 24 recommended)
 - npm
 
 ## Installation
