@@ -80,13 +80,32 @@ function normalizeConfig(rawConfig: any): Config {
         groups: groups.map((group: any) => ({
             ...group,
             alerts: group?.alerts
-                ? {
-                      channel: group.alerts.channel,
-                      destination: group.alerts.destination,
+                ? (() => {
+                      const channel = ["none", "email", "sms", "email_sms"].includes(group.alerts.channel)
+                          ? group.alerts.channel
+                          : "none";
+                      const legacyDestination = typeof group.alerts.destination === "string"
+                          ? group.alerts.destination
+                          : "";
+                      return {
+                      channel,
+                      emailDestination:
+                          typeof group.alerts.emailDestination === "string"
+                              ? group.alerts.emailDestination
+                              : channel === "email"
+                                  ? legacyDestination
+                                  : "",
+                      smsDestination:
+                          typeof group.alerts.smsDestination === "string"
+                              ? group.alerts.smsDestination
+                              : channel === "sms"
+                                  ? legacyDestination
+                                  : "",
                       downAfterMinutes: toPositiveNumber(group.alerts.downAfterMinutes),
                       downAfterChecks: toPositiveNumber(group.alerts.downAfterChecks),
                       repeatDownEveryMinutes: toPositiveNumber(group.alerts.repeatDownEveryMinutes),
-                  }
+                  };
+                  })()
                 : undefined,
             targets: Array.isArray(group?.targets)
                 ? group.targets.map((target: any) => ({

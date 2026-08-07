@@ -49,6 +49,10 @@ const insertStmt = db.prepare(`
     INSERT INTO service_history (config_set, name, group_name, up, latency, time)
     VALUES (?, ?, ?, ?, ?, ?)
 `);
+const deleteGroupHistoryStmt = db.prepare(`
+    DELETE FROM service_history
+    WHERE config_set = ? AND group_name = ?
+`);
 
 export function setStatus(setId: string, status: any[]) {
     currentStatusBySet[setId] = status;
@@ -103,4 +107,8 @@ export function getHistory(setId: string = DEFAULT_SET_ID) {
     }
 
     return result;
+}
+
+export function clearHistoryForGroup(setId: string, groupName: string): number {
+    return deleteGroupHistoryStmt.run(setId, groupName).changes;
 }

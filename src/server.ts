@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
-import { startScheduler } from "./scheduler";
-import { getStatus, getHistory } from "./state";
+import { refreshAlertConfiguration, startScheduler } from "./scheduler";
+import { clearHistoryForGroup, getStatus, getHistory } from "./state";
 import { watchConfig } from "./config-watcher";
 import {
     addConfigSet,
@@ -23,6 +23,7 @@ startScheduler();
 
 // watch config changes at runtime
 watchConfig(() => {
+    refreshAlertConfiguration();
     console.log("🔄 Config updated at runtime");
 });
 
@@ -68,6 +69,7 @@ app.patch("/api/config-sets/:setId", (req, res) => {
 app.delete("/api/config-sets/:setId", (req, res) => {
     try {
         deleteConfigSet(req.params.setId);
+        refreshAlertConfiguration();
         res.status(204).send();
     } catch (err: any) {
         const message = String(err?.message || "");
@@ -95,6 +97,21 @@ app.get("/api/config-sets/:setId/history", (req, res) => {
         return res.status(404).json({ error: "Configuration set not found" });
     }
     res.json(getHistory(setId));
+});
+
+app.delete("/api/config-sets/:setId/history", (req, res) => {
+    const { setId } = req.params;
+    if (!hasConfigSet(setId)) {
+        return res.status(404).json({ error: "Configuration set not found" });
+    }
+
+    const groupName = typeof req.query.group === "string" ? req.query.group : "";
+    if (!groupName.trim()) {
+        return res.status(400).json({ error: "Group name is required" });
+    }
+
+    const deleted = clearHistoryForGroup(setId, groupName);
+    res.json({ success: true, deleted });
 });
 
 // GET config
@@ -128,6 +145,7 @@ app.post("/api/config", (req, res) => {
         }
 
         setConfig(newConfig);
+        refreshAlertConfiguration();
 
         res.json({ success: true });
     } catch (err: any) {
@@ -148,6 +166,7 @@ app.post("/api/config-sets/:setId/config", (req, res) => {
         }
 
         setConfigBySetId(req.params.setId, newConfig);
+        refreshAlertConfiguration();
         res.json({ success: true });
     } catch (err: any) {
         if (String(err?.message || "").includes("Unknown config set")) {

@@ -4,7 +4,7 @@ Simple uptime monitoring app with:
 
 - **Node.js + TypeScript backend** (Express API + scheduler)
 - **React frontend** (built with Vite)
-- **Config-driven checks** for `http` and `tcp` targets
+- **Config-driven checks** for `http`, `tcp`, and ICMP `ping` targets
 - **SQLite-backed persistence** for status/history and configuration sets
 
 ## Features
@@ -103,7 +103,7 @@ sqlite3 ./data/uptime.db < ./data/config_sets_seed.sql
 
 ### Alerting behavior
 
-- Alerts are configured at **group** level (`alerts.channel` + `alerts.destination`).
+- Alerts are configured at **group** level and can be disabled, sent by email, sent by SMS, or sent through both channels.
 - Each **target** can enable/disable alerts with `target.alerts.enabled` (defaults to `true`).
 - A `DOWN` alert is sent only when at least one configured threshold is met:
   - `alerts.downAfterMinutes`: send after target has been continuously down for this duration.

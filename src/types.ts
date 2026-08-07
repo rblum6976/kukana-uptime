@@ -1,6 +1,6 @@
 export type Target = {
     name: string;
-    type: "http" | "tcp";
+    type: "http" | "tcp" | "ping";
     url?: string;
     host?: string;
     port?: number;
@@ -10,10 +10,13 @@ export type Target = {
 };
 
 export type GroupAlertChannel = "email" | "sms";
+export type GroupAlertMode = "none" | GroupAlertChannel | "email_sms";
 
 export type GroupAlerts = {
-    channel: GroupAlertChannel;
-    destination: string;
+    channel: GroupAlertMode;
+    destination?: string;
+    emailDestination?: string;
+    smsDestination?: string;
     downAfterMinutes?: number;
     downAfterChecks?: number;
     repeatDownEveryMinutes?: number;

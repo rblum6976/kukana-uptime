@@ -1,17 +1,31 @@
 import chokidar from "chokidar";
-import { load, setConfigStore } from "./config";
+import { getConfigBySetId, getConfigSets, load } from "./config";
 
 const dbPath = process.env.DB_PATH || "./data/uptime.db";
 
+function getConfigSnapshot() {
+    return JSON.stringify(
+        getConfigSets().map((set) => ({
+            ...set,
+            config: getConfigBySetId(set.id),
+        })),
+    );
+}
+
 export function watchConfig(onChange?: () => void) {
+    let configSnapshot = getConfigSnapshot();
     const watcher = chokidar.watch(dbPath, {
         ignoreInitial: true,
     });
 
     watcher.on("change", () => {
         try {
-            const newStore = load();
-            setConfigStore(newStore);
+            load();
+            const nextConfigSnapshot = getConfigSnapshot();
+            if (nextConfigSnapshot === configSnapshot) {
+                return;
+            }
+            configSnapshot = nextConfigSnapshot;
 
             console.log("📄 Config reloaded");
 

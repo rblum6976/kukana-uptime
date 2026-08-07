@@ -12,8 +12,10 @@ type AlertPayload = {
 
 type EmailDeliveryResult = {
     sent: boolean;
-    reason?: "smtp_not_configured";
+    reason?: "smtp_not_configured" | "stale_config";
 };
+
+type AlertDeliveryGuard = () => boolean;
 
 function formatDuration(durationMs: number) {
     const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
@@ -41,7 +43,11 @@ function formatMessage(payload: AlertPayload) {
     return base;
 }
 
-async function sendEmailViaSmtp(payload: AlertPayload, message: string): Promise<EmailDeliveryResult> {
+async function sendEmailViaSmtp(
+    payload: AlertPayload,
+    message: string,
+    shouldSend: AlertDeliveryGuard,
+): Promise<EmailDeliveryResult> {
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || 0);
     const from = process.env.ALERT_FROM_EMAIL || "kukana-uptime@localhost";
@@ -68,6 +74,10 @@ async function sendEmailViaSmtp(payload: AlertPayload, message: string): Promise
         .join(", ");
 
     const nodemailerModule = await import("nodemailer");
+    if (!shouldSend()) {
+        return { sent: false, reason: "stale_config" };
+    }
+
     const nodemailer = nodemailerModule.default;
     const transporter = nodemailer.createTransport({
         host,
@@ -94,11 +104,19 @@ async function sendEmailViaSmtp(payload: AlertPayload, message: string): Promise
     };
 }
 
-async function sendEmailAlert(payload: AlertPayload) {
+async function sendEmailAlert(payload: AlertPayload, shouldSend: AlertDeliveryGuard) {
     const message = formatMessage(payload);
-    const deliveryResult = await sendEmailViaSmtp(payload, message);
+    const deliveryResult = await sendEmailViaSmtp(payload, message, shouldSend);
 
     if (!deliveryResult.sent) {
+        if (deliveryResult.reason === "stale_config") {
+            console.log("🔕 Alert canceled after config update", {
+                target: payload.targetName,
+                state: payload.isUp ? "UP" : "DOWN",
+            });
+            return;
+        }
+
         console.warn("📭 Email alert not sent", {
             to: payload.destination,
             target: payload.targetName,
@@ -123,11 +141,17 @@ async function sendSmsAlert(payload: AlertPayload) {
     });
 }
 
-export async function sendAlert(payload: AlertPayload) {
-    if (payload.channel === "email") {
-        await sendEmailAlert(payload);
+export async function sendAlert(payload: AlertPayload, shouldSend: AlertDeliveryGuard = () => true) {
+    if (!shouldSend()) {
         return;
     }
 
-    await sendSmsAlert(payload);
+    if (payload.channel === "email") {
+        await sendEmailAlert(payload, shouldSend);
+        return;
+    }
+
+    if (shouldSend()) {
+        await sendSmsAlert(payload);
+    }
 }
