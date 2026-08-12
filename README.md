@@ -90,7 +90,7 @@ Server port is configured with `.env` (`PORT`, default in this repo: `3005`).
 
 App runtime settings are centralized in `.env`:
 
-- Backend: `PORT`, `DB_PATH`, `ALERT_FROM_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
+- Backend: `PORT`, `DB_PATH`, `ALERT_FROM_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `COURIER_API_KEY`
 - Frontend (Vite): `VITE_DEV_HOST`, `VITE_DEV_PORT`, `VITE_API_PROXY_TARGET`
 - Docker/cloudflared: `TUNNEL_TOKEN`
 
@@ -111,7 +111,7 @@ sqlite3 ./data/uptime.db < ./data/config_sets_seed.sql
 - If both thresholds are set, the alert triggers when either threshold is reached.
 - Repeated `DOWN` alerts are rate-limited by `alerts.repeatDownEveryMinutes` (default: `30`).
 - `UP` recovery alerts are sent once when the target comes back online after an alerted outage, including total downtime.
-- `sms` is available in config/UI as a placeholder channel for future provider integration.
+- SMS alerts are delivered through Courier and require an SMS integration configured in the Courier account.
 
 ### Alerting environment variables
 
@@ -120,6 +120,13 @@ sqlite3 ./data/uptime.db < ./data/config_sets_seed.sql
 - `SMTP_PORT`: SMTP server port (required for real email sending).
 - `SMTP_SECURE` (optional): set to `true` for SMTPS/TLS ports.
 - `SMTP_USER` / `SMTP_PASS` (optional): SMTP authentication credentials.
+- `COURIER_API_KEY`: Courier API key used for SMS alerts. `COURIER_AUTH_TOKEN` is also accepted for compatibility.
+
+Add the Courier key to `.env`:
+
+```dotenv
+COURIER_API_KEY=pk_prod_your_courier_api_key
+```
 
 ## API Endpoints
 
