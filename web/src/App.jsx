@@ -5,6 +5,10 @@ import { Dashboard } from "./components/Dashboard";
 import { actionButtonStyle, modeButtonStyle } from "./components/styles";
 
 const APP_TITLE_FALLBACK = "Kukana - Uptime Dashboard";
+const APP_VERSION = typeof __APP_VERSION__ !== "undefined"
+    ? __APP_VERSION__
+    : (import.meta.env?.VITE_APP_VERSION || "1.2.0");
+const VERSION_STRING = APP_VERSION.startsWith("v") ? APP_VERSION : `v${APP_VERSION}`;
 
 function readSetIdFromPath() {
     const match = window.location.pathname.match(/^\/sets\/([^/]+)$/);
@@ -220,7 +224,23 @@ export function App() {
     return (
         <div style={{ fontFamily: "system-ui", background: "#020617", color: "#e5e7eb", minHeight: "100vh", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "18px", flexWrap: "wrap" }}>
-                <h1 style={{ margin: 0 }}>{isIndexPage ? APP_TITLE_FALLBACK : config.appTitle || APP_TITLE_FALLBACK}</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <h1 style={{ margin: 0 }}>{isIndexPage ? APP_TITLE_FALLBACK : config.appTitle || APP_TITLE_FALLBACK}</h1>
+                    <span
+                        style={{
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            color: "#94a3b8",
+                            background: "#0f172a",
+                            border: "1px solid #334155",
+                            borderRadius: "6px",
+                            padding: "2px 8px",
+                            letterSpacing: "0.02em",
+                        }}
+                    >
+                        {VERSION_STRING}
+                    </span>
+                </div>
                 {!isIndexPage && (
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                         <button style={actionButtonStyle} onClick={() => navigateToSet(null)}>All Sets</button>

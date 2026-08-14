@@ -1,0 +1,2 @@
+[registry."tnum-services:5000"]
+  http = true
