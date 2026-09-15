@@ -4,15 +4,15 @@ import { refreshAlertConfiguration, startScheduler } from "./scheduler";
 import { clearHistoryForGroup, getStatus, getHistory } from "./state";
 import { watchConfig } from "./config-watcher";
 import {
-    addConfigSet,
-    deleteConfigSet,
+    addDashboard,
+    deleteDashboard,
     getConfig,
-    getConfigBySetId,
-    getConfigSets,
-    hasConfigSet,
+    getDashboardConfig,
+    getDashboards,
+    hasDashboard,
     setConfig,
-    setConfigBySetId,
-    updateConfigSetName,
+    setDashboardConfig,
+    updateDashboardName,
 } from "./config";
 
 const app = express();
@@ -36,75 +36,76 @@ app.get("/api/status", (req, res) => {
     res.json(getStatus());
 });
 
-app.get("/api/config-sets", (req, res) => {
-    res.json(getConfigSets());
+// Dashboards routes
+app.get("/api/dashboards", (req, res) => {
+    res.json(getDashboards());
 });
 
-app.post("/api/config-sets", (req, res) => {
+app.post("/api/dashboards", (req, res) => {
     try {
         const name = typeof req.body?.name === "string" ? req.body.name : "";
         const id = typeof req.body?.id === "string" ? req.body.id : undefined;
-        const createdSet = addConfigSet(name, id);
+        const createdSet = addDashboard(name, id);
         res.status(201).json(createdSet);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.patch("/api/config-sets/:setId", (req, res) => {
+app.patch("/api/dashboards/:setId", (req, res) => {
     try {
         const name = typeof req.body?.name === "string" ? req.body.name : "";
-        const updatedSet = updateConfigSetName(req.params.setId, name);
+        const updatedSet = updateDashboardName(req.params.setId, name);
         res.json(updatedSet);
     } catch (err: any) {
         const message = String(err?.message || "");
-        if (message.includes("Unknown config set")) {
-            return res.status(404).json({ error: "Configuration set not found" });
+        if (message.includes("Unknown dashboard")) {
+            return res.status(404).json({ error: "Dashboard not found" });
         }
         if (message.includes("required")) {
-            return res.status(400).json({ error: "Set name is required" });
+            return res.status(400).json({ error: "Dashboard name is required" });
         }
         res.status(500).json({ error: err.message });
     }
 });
 
-app.delete("/api/config-sets/:setId", (req, res) => {
+app.delete("/api/dashboards/:setId", (req, res) => {
     try {
-        deleteConfigSet(req.params.setId);
+        deleteDashboard(req.params.setId);
         refreshAlertConfiguration();
         res.status(204).send();
     } catch (err: any) {
         const message = String(err?.message || "");
-        if (message.includes("Unknown config set")) {
-            return res.status(404).json({ error: "Configuration set not found" });
+        if (message.includes("Unknown dashboard")) {
+            return res.status(404).json({ error: "Dashboard not found" });
         }
-        if (message.includes("At least one configuration set")) {
-            return res.status(409).json({ error: "At least one configuration set is required" });
+        if (message.includes("At least one dashboard")) {
+            return res.status(409).json({ error: "At least one dashboard is required" });
         }
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get("/api/config-sets/:setId/status", (req, res) => {
+app.get("/api/dashboards/:setId/status", (req, res) => {
     const { setId } = req.params;
-    if (!hasConfigSet(setId)) {
-        return res.status(404).json({ error: "Configuration set not found" });
+    if (!hasDashboard(setId)) {
+        return res.status(404).json({ error: "Dashboard not found" });
     }
     res.json(getStatus(setId));
 });
 
-app.get("/api/config-sets/:setId/history", (req, res) => {
+app.get("/api/dashboards/:setId/history", (req, res) => {
     const { setId } = req.params;
-    if (!hasConfigSet(setId)) {
-        return res.status(404).json({ error: "Configuration set not found" });
+    if (!hasDashboard(setId)) {
+        return res.status(404).json({ error: "Dashboard not found" });
     }
     res.json(getHistory(setId));
 });
 
-app.delete("/api/config-sets/:setId/history", (req, res) => {
+app.delete("/api/dashboards/:setId/history", (req, res) => {
     const { setId } = req.params;
-    if (!hasConfigSet(setId)) {
-        return res.status(404).json({ error: "Configuration set not found" });
+    if (!hasDashboard(setId)) {
+        return res.status(404).json({ error: "Dashboard not found" });
     }
 
     const groupName = typeof req.query.group === "string" ? req.query.group : "";
@@ -121,11 +122,11 @@ app.get("/api/config", (req, res) => {
     res.json(getConfig());
 });
 
-app.get("/api/config-sets/:setId/config", (req, res) => {
+app.get("/api/dashboards/:setId/config", (req, res) => {
     try {
-        res.json(getConfigBySetId(req.params.setId));
+        res.json(getDashboardConfig(req.params.setId));
     } catch {
-        res.status(404).json({ error: "Configuration set not found" });
+        res.status(404).json({ error: "Dashboard not found" });
     }
 });
 
@@ -156,7 +157,7 @@ app.post("/api/config", (req, res) => {
     }
 });
 
-app.post("/api/config-sets/:setId/config", (req, res) => {
+app.post("/api/dashboards/:setId/config", (req, res) => {
     try {
         if (!req.body) {
             return res.status(400).json({ error: "Missing JSON body" });
@@ -167,12 +168,12 @@ app.post("/api/config-sets/:setId/config", (req, res) => {
             return res.status(400).json({ error: "Invalid config: missing groups" });
         }
 
-        setConfigBySetId(req.params.setId, newConfig);
+        setDashboardConfig(req.params.setId, newConfig);
         refreshAlertConfiguration();
         res.json({ success: true });
     } catch (err: any) {
-        if (String(err?.message || "").includes("Unknown config set")) {
-            return res.status(404).json({ error: "Configuration set not found" });
+        if (String(err?.message || "").includes("Unknown dashboard")) {
+            return res.status(404).json({ error: "Dashboard not found" });
         }
         res.status(500).json({ error: err.message });
     }
@@ -180,7 +181,13 @@ app.post("/api/config-sets/:setId/config", (req, res) => {
 
 // Serve frontend
 app.use(express.static(path.join(__dirname, "../web/dist")));
-app.get(["/", "/sets/:setId"], (req, res) => {
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "../web/dist/index.html"));
+});
+app.get("/sets/:setId", (req, res) => {
+    res.sendFile(path.join(__dirname, "../web/dist/index.html"));
+});
+app.get("/dashboards/:setId", (req, res) => {
     res.sendFile(path.join(__dirname, "../web/dist/index.html"));
 });
 

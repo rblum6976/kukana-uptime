@@ -1,5 +1,5 @@
 import { checkTarget } from "./checker";
-import { getConfigBySetId, getConfigSets } from "./config";
+import { getDashboardConfig, getDashboards } from "./config";
 import { setStatus } from "./state";
 import { sendAlert } from "./alerter";
 import { GroupAlertChannel, GroupAlerts } from "./types";
@@ -71,7 +71,7 @@ export function startScheduler() {
     async function runChecks() {
         try {
             const cycleAlertConfigRevision = alertConfigRevision;
-            const sets = getConfigSets();
+            const sets = getDashboards();
 
             const currentStatusByTarget: Record<string, boolean> = {};
             const activeTargetKeys = new Set<string>();
@@ -79,9 +79,9 @@ export function startScheduler() {
             for (const set of sets) {
                 let config;
                 try {
-                    config = getConfigBySetId(set.id);
+                    config = getDashboardConfig(set.id);
                 } catch (err) {
-                    console.warn(`⚠️ Skipping removed or unknown config set: ${set.id}`);
+                    console.warn(`⚠️ Skipping removed or unknown dashboard: ${set.id}`);
                     continue;
                 }
 

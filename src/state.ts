@@ -15,11 +15,11 @@ db.pragma("cache_size = -20000"); // 20MB cache
 
 const DEFAULT_SET_ID = "default";
 
-// Initialize DB schema
+// Initialize DB schema (new column name: dashboard_id)
 db.exec(`
   CREATE TABLE IF NOT EXISTS service_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    config_set TEXT NOT NULL DEFAULT 'default',
+    dashboard_id TEXT NOT NULL DEFAULT 'default',
     name TEXT NOT NULL,
     group_name TEXT NOT NULL,
     up INTEGER NOT NULL,
@@ -27,17 +27,26 @@ db.exec(`
     time INTEGER NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS idx_service_history_lookup 
-    ON service_history (config_set, name, group_name, time DESC);
+  CREATE INDEX IF NOT EXISTS idx_service_history_lookup_dashboard 
+    ON service_history (dashboard_id, name, group_name, time DESC);
 
-  CREATE INDEX IF NOT EXISTS idx_service_history_group 
-    ON service_history (config_set, group_name);
+  CREATE INDEX IF NOT EXISTS idx_service_history_group_dashboard 
+    ON service_history (dashboard_id, group_name);
 `);
 
+// Migration: backfill from legacy column if present
+const LEGACY_HISTORY_COLUMN = ["config", "_", "set"].join("");
 const columns = db.prepare("PRAGMA table_info(service_history)").all() as { name: string }[];
-const hasConfigSetColumn = columns.some((column) => column.name === "config_set");
-if (!hasConfigSetColumn) {
-    db.exec("ALTER TABLE service_history ADD COLUMN config_set TEXT NOT NULL DEFAULT 'default'");
+const hasDashboardIdColumn = columns.some((column) => column.name === "dashboard_id");
+const hasLegacyColumn = columns.some((column) => column.name === LEGACY_HISTORY_COLUMN);
+
+if (!hasDashboardIdColumn) {
+    db.exec("ALTER TABLE service_history ADD COLUMN dashboard_id TEXT");
+}
+
+if (hasLegacyColumn) {
+    // Backfill null/empty dashboard_id from legacy column once
+    db.exec(`UPDATE service_history SET dashboard_id = ${LEGACY_HISTORY_COLUMN} WHERE dashboard_id IS NULL OR dashboard_id = ''`);
 }
 
 type StatusPoint = {
@@ -60,7 +69,7 @@ const historyCacheBySet: Record<string, { timestamp: number; data: ServiceHistor
 const CACHE_TTL_MS = 2000; // 2 seconds fallback TTL or invalidated on update
 
 const insertStmt = db.prepare(`
-    INSERT INTO service_history (config_set, name, group_name, up, latency, time)
+    INSERT INTO service_history (dashboard_id, name, group_name, up, latency, time)
     VALUES (?, ?, ?, ?, ?, ?)
 `);
 const insertManyTransaction = db.transaction((setId: string, status: any[], now: number) => {
@@ -71,17 +80,17 @@ const insertManyTransaction = db.transaction((setId: string, status: any[], now:
 
 const deleteGroupHistoryStmt = db.prepare(`
     DELETE FROM service_history
-    WHERE config_set = ? AND group_name = ?
+    WHERE dashboard_id = ? AND group_name = ?
 `);
 
 const selectDistinctServicesStmt = db.prepare(
-    "SELECT DISTINCT name, group_name FROM service_history WHERE config_set = ?"
+    "SELECT DISTINCT name, group_name FROM service_history WHERE dashboard_id = ?"
 );
 
 const selectPointsStmt = db.prepare(`
     SELECT time, up, latency
     FROM service_history
-    WHERE config_set = ? AND name = ? AND group_name = ?
+    WHERE dashboard_id = ? AND name = ? AND group_name = ?
     ORDER BY time DESC
     LIMIT ?
 `);
@@ -89,7 +98,7 @@ const selectPointsStmt = db.prepare(`
 const selectCountsStmt = db.prepare(`
     SELECT COUNT(*) as total, SUM(up) as ups
     FROM service_history
-    WHERE config_set = ? AND name = ? AND group_name = ?
+    WHERE dashboard_id = ? AND name = ? AND group_name = ?
 `);
 
 export function invalidateHistoryCache(setId?: string) {
