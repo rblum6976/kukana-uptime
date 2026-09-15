@@ -6,7 +6,9 @@ const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.ur
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "");
-    const appVersion = env.VITE_APP_VERSION || env.APP_VERSION || process.env.APP_VERSION || pkg.version || "1.2.0";
+    // package.json is the canonical app version. VITE_APP_VERSION remains an
+    // explicit frontend-only override for exceptional builds.
+    const appVersion = env.VITE_APP_VERSION || pkg.version || "unknown";
 
     return {
         root: "web",

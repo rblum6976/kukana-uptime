@@ -26,12 +26,6 @@ db.exec(`
     latency INTEGER,
     time INTEGER NOT NULL
   );
-
-  CREATE INDEX IF NOT EXISTS idx_service_history_lookup_dashboard 
-    ON service_history (dashboard_id, name, group_name, time DESC);
-
-  CREATE INDEX IF NOT EXISTS idx_service_history_group_dashboard 
-    ON service_history (dashboard_id, group_name);
 `);
 
 // Migration: backfill from legacy column if present
@@ -48,6 +42,15 @@ if (hasLegacyColumn) {
     // Backfill null/empty dashboard_id from legacy column once
     db.exec(`UPDATE service_history SET dashboard_id = ${LEGACY_HISTORY_COLUMN} WHERE dashboard_id IS NULL OR dashboard_id = ''`);
 }
+
+// Create indexes only after older databases have the new column.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_service_history_lookup_dashboard
+    ON service_history (dashboard_id, name, group_name, time DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_service_history_group_dashboard
+    ON service_history (dashboard_id, group_name);
+`);
 
 type StatusPoint = {
     time: number;
