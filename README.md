@@ -5,7 +5,7 @@ Simple uptime monitoring app with:
 - **Node.js + TypeScript backend** (Express API + scheduler)
 - **React frontend** (built with Vite)
 - **Config-driven checks** for `http`, `tcp`, and ICMP `ping` targets
-- **SQLite-backed persistence** for status/history and configuration sets
+- **SQLite-backed persistence** for status/history and dashboards
 
 ## Features
 
@@ -27,7 +27,7 @@ Simple uptime monitoring app with:
 src/            # backend (API, scheduler, checker, state, config store)
 web/src/        # React app source
 web/dist/       # built frontend assets
-data/uptime.db  # sqlite database (status/history + configuration sets)
+data/uptime.db  # sqlite database (status/history + dashboards)
 dist/           # compiled backend output
 ```
 
@@ -94,11 +94,11 @@ App runtime settings are centralized in `.env`:
 - Frontend (Vite): `VITE_DEV_HOST`, `VITE_DEV_PORT`, `VITE_API_PROXY_TARGET`
 - Docker/cloudflared: `TUNNEL_TOKEN`
 
-`DB_PATH` defaults to `./data/uptime.db` and stores configuration sets plus monitoring history.
-To load exported sets directly into SQLite, use the seed script:
+`DB_PATH` defaults to `./data/uptime.db` and stores dashboards plus monitoring history.
+To load exported dashboards directly into SQLite, use the seed script:
 
 ```bash
-sqlite3 ./data/uptime.db < ./data/config_sets_seed.sql
+sqlite3 ./data/uptime.db < ./data/dashboards_seed.sql
 ```
 
 ### Alerting behavior

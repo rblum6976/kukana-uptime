@@ -34,17 +34,17 @@ export interface Config {
     groups: Group[];
 }
 
-export type ConfigSet = {
+export type Dashboard = {
     id: string;
     name: string;
     config: Config;
 };
 
-export type ConfigSetMeta = {
+export type DashboardMeta = {
     id: string;
     name: string;
 };
 
-export type ConfigStore = {
-    sets: ConfigSet[];
+export type DashboardStore = {
+    dashboards: Dashboard[];
 };

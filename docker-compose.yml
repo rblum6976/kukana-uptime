@@ -1,6 +1,6 @@
 services:
   kukana-uptime:
-    image: kukana-uptime:1.1.0-amd64
+    image: kukana-uptime:latest-amd64
     container_name: kukana-uptime
     restart: unless-stopped
     env_file:

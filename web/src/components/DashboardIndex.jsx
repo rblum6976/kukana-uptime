@@ -42,7 +42,7 @@ function Dialog({ title, description, error, children, onClose, onSubmit, submit
     );
 }
 
-export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
+export function DashboardIndex({ sets, onNavigate, onRefresh }) {
     const [dialog, setDialog] = useState(null);
     const [selectedSet, setSelectedSet] = useState(null);
     const [name, setName] = useState("");
@@ -64,11 +64,11 @@ export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
 
     async function createSet() {
         if (!name.trim()) {
-            setError("Enter a set name");
+            setError("Enter a dashboard name");
             return;
         }
         try {
-            const response = await fetch("/api/config-sets", {
+            const response = await fetch("/api/dashboards", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: name.trim() }),
@@ -79,17 +79,17 @@ export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
             await onRefresh();
             onNavigate(created.id);
         } catch {
-            setError("Failed to create configuration set");
+            setError("Failed to create dashboard");
         }
     }
 
     async function editSet() {
         if (!selectedSet || !name.trim()) {
-            setError("Enter a set name");
+            setError("Enter a dashboard name");
             return;
         }
         try {
-            const response = await fetch(`/api/config-sets/${encodeURIComponent(selectedSet.id)}`, {
+            const response = await fetch(`/api/dashboards/${encodeURIComponent(selectedSet.id)}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: name.trim() }),
@@ -98,26 +98,26 @@ export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
             closeDialog();
             await onRefresh();
         } catch {
-            setError("Failed to update configuration set");
+            setError("Failed to update dashboard");
         }
     }
 
     async function deleteSet() {
         if (!selectedSet) return;
         try {
-            const response = await fetch(`/api/config-sets/${encodeURIComponent(selectedSet.id)}`, { method: "DELETE" });
+            const response = await fetch(`/api/dashboards/${encodeURIComponent(selectedSet.id)}`, { method: "DELETE" });
             if (!response.ok) throw new Error();
             closeDialog();
             await onRefresh();
         } catch {
-            setError("Failed to delete configuration set");
+            setError("Failed to delete dashboard");
         }
     }
 
     const nameInput = (
         <input
             value={name}
-            placeholder="Set name"
+            placeholder="Dashboard name"
             style={inputBaseStyle}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
@@ -140,7 +140,7 @@ export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
                     gap: "16px",
                 }}
             >
-                <div style={{ color: "#94a3b8", fontSize: "14px" }}>Select a configuration set or create a new one.</div>
+                <div style={{ color: "#94a3b8", fontSize: "14px" }}>Select a dashboard or create a new one.</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "14px" }}>
                     {sets.map((set) => (
                         <div
@@ -191,21 +191,21 @@ export function ConfigSetIndex({ sets, onNavigate, onRefresh }) {
                         </div>
                     ))}
                 </div>
-                <div><button style={modeButtonStyle} onClick={() => openDialog("create")}>Create Set</button></div>
+                <div><button style={modeButtonStyle} onClick={() => openDialog("create")}>Create Dashboard</button></div>
             </div>
 
             {dialog === "create" && (
-                <Dialog title="Create configuration set" description="Enter a name. The set ID will be generated automatically." error={error} onClose={closeDialog} onSubmit={createSet} submitLabel="Create Set">
+                <Dialog title="Create dashboard" description="Enter a name. The dashboard ID will be generated automatically." error={error} onClose={closeDialog} onSubmit={createSet} submitLabel="Create Dashboard">
                     {nameInput}
                 </Dialog>
             )}
             {dialog === "edit" && selectedSet && (
-                <Dialog title="Edit configuration set" description={`Update the set name for ${selectedSet.id}.`} error={error} onClose={closeDialog} onSubmit={editSet} submitLabel="Save">
+                <Dialog title="Edit dashboard" description={`Update the dashboard name for ${selectedSet.id}.`} error={error} onClose={closeDialog} onSubmit={editSet} submitLabel="Save">
                     {nameInput}
                 </Dialog>
             )}
             {dialog === "delete" && selectedSet && (
-                <Dialog title="Delete configuration set" description={`Are you sure you want to delete ${selectedSet.name}? This cannot be undone.`} error={error} onClose={closeDialog} onSubmit={deleteSet} submitLabel="Delete" danger />
+                <Dialog title="Delete dashboard" description={`Are you sure you want to delete ${selectedSet.name}? This cannot be undone.`} error={error} onClose={closeDialog} onSubmit={deleteSet} submitLabel="Delete" danger />
             )}
         </>
     );

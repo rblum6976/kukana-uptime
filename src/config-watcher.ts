@@ -1,12 +1,12 @@
-import { getConfigBySetId, getConfigSets, load } from "./config";
+import { getDashboardConfig, getDashboards, load } from "./config";
 
 const dbPath = process.env.DB_PATH || "./data/uptime.db";
 
 function getConfigSnapshot() {
     return JSON.stringify(
-        getConfigSets().map((set) => ({
+        getDashboards().map((set) => ({
             ...set,
-            config: getConfigBySetId(set.id),
+            config: getDashboardConfig(set.id),
         })),
     );
 }

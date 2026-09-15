@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ConfigEditor } from "./components/ConfigEditor";
-import { ConfigSetIndex } from "./components/ConfigSetIndex";
+import { DashboardIndex } from "./components/DashboardIndex";
 import { Dashboard } from "./components/Dashboard";
 import { actionButtonStyle, modeButtonStyle } from "./components/styles";
 
@@ -11,7 +11,7 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined"
 const VERSION_STRING = APP_VERSION.startsWith("v") ? APP_VERSION : `v${APP_VERSION}`;
 
 function readSetIdFromPath() {
-    const match = window.location.pathname.match(/^\/sets\/([^/]+)$/);
+    const match = window.location.pathname.match(/^\/(?:dashboards|sets)\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
 }
 
@@ -72,7 +72,7 @@ function validateConfig(config) {
 }
 
 export function App() {
-    const [configSets, setConfigSets] = useState([]);
+    const [dashboards, setDashboards] = useState([]);
     const [activeSetId, setActiveSetId] = useState(() => readSetIdFromPath());
     const [status, setStatus] = useState([]);
     const [config, setConfig] = useState(null);
@@ -88,29 +88,29 @@ export function App() {
     const isIndexPage = !activeSetId;
 
     function navigateToSet(setId) {
-        const path = setId ? `/sets/${encodeURIComponent(setId)}` : "/";
+        const path = setId ? `/dashboards/${encodeURIComponent(setId)}` : "/";
         window.history.pushState({}, "", path);
         if (setId && setId !== activeSetId) setConfig(null);
         setActiveSetId(readSetIdFromPath());
         setMode("dashboard");
     }
 
-    async function fetchConfigSets() {
-        const response = await fetch("/api/config-sets");
-        if (!response.ok) throw new Error("Failed to load configuration sets");
-        setConfigSets(await response.json());
+    async function fetchDashboards() {
+        const response = await fetch("/api/dashboards");
+        if (!response.ok) throw new Error("Failed to load dashboards");
+        setDashboards(await response.json());
     }
 
     async function fetchStatus() {
         if (!activeSetId) return;
-        const response = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/status`);
+        const response = await fetch(`/api/dashboards/${encodeURIComponent(activeSetId)}/status`);
         if (!response.ok) throw new Error("Failed to load status");
         setStatus(await response.json());
     }
 
     async function fetchConfig() {
         if (!activeSetId) return;
-        const response = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/config`);
+        const response = await fetch(`/api/dashboards/${encodeURIComponent(activeSetId)}/config`);
         if (!response.ok) throw new Error("Failed to load config");
         const nextConfig = await response.json();
         setConfig(nextConfig);
@@ -120,7 +120,7 @@ export function App() {
     async function fetchHistory() {
         if (!activeSetId) return;
         const requestVersion = historyRequestVersion.current;
-        const response = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/history`);
+        const response = await fetch(`/api/dashboards/${encodeURIComponent(activeSetId)}/history`);
         if (!response.ok) throw new Error("Failed to load history");
         const nextHistory = await response.json();
         if (requestVersion === historyRequestVersion.current) {
@@ -142,7 +142,7 @@ export function App() {
 
         async function loadInitialData() {
             try {
-                await fetchConfigSets();
+                await fetchDashboards();
                 if (activeSetId) await Promise.all([fetchStatus(), fetchConfig(), fetchHistory()]);
                 setLoadError("");
             } catch {
@@ -176,7 +176,7 @@ export function App() {
         }
 
         try {
-            const response = await fetch(`/api/config-sets/${encodeURIComponent(activeSetId)}/config`, {
+            const response = await fetch(`/api/dashboards/${encodeURIComponent(activeSetId)}/config`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config),
@@ -197,7 +197,7 @@ export function App() {
         try {
             const query = new URLSearchParams({ group: groupName });
             const response = await fetch(
-                `/api/config-sets/${encodeURIComponent(activeSetId)}/history?${query}`,
+                `/api/dashboards/${encodeURIComponent(activeSetId)}/history?${query}`,
                 { method: "DELETE" },
             );
             if (!response.ok) throw new Error();
@@ -243,7 +243,7 @@ export function App() {
                 </div>
                 {!isIndexPage && (
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <button style={actionButtonStyle} onClick={() => navigateToSet(null)}>All Sets</button>
+                        <button style={actionButtonStyle} onClick={() => navigateToSet(null)}>All Dashboards</button>
                         <button style={modeButtonStyle} onClick={() => setMode(mode === "dashboard" ? "config" : "dashboard")}>
                             {mode === "dashboard" ? "Edit Config" : "Back"}
                         </button>
@@ -251,7 +251,7 @@ export function App() {
                 )}
             </div>
 
-            {isIndexPage && <ConfigSetIndex sets={configSets} onNavigate={navigateToSet} onRefresh={fetchConfigSets} />}
+            {isIndexPage && <DashboardIndex sets={dashboards} onNavigate={navigateToSet} onRefresh={fetchDashboards} />}
             {!isIndexPage && mode === "dashboard" && (
                 <Dashboard
                     grouped={groupedStatus}
