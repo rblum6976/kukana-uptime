@@ -73,26 +73,20 @@ async function sendEmailViaSmtp(
         .filter(Boolean)
         .join(", ");
 
-    const nodemailerModule = await import("nodemailer");
+    const { SMTPClient } = await import("emailjs");
     if (!shouldSend()) {
         return { sent: false, reason: "stale_config" };
     }
 
-    const nodemailer = nodemailerModule.default;
-    const transporter = nodemailer.createTransport({
+    const client = new SMTPClient({
         host,
         port,
-        secure: process.env.SMTP_SECURE === "true",
-        auth:
-            process.env.SMTP_USER && process.env.SMTP_PASS
-                ? {
-                      user: process.env.SMTP_USER,
-                      pass: process.env.SMTP_PASS,
-                  }
-                : undefined,
+        ssl: process.env.SMTP_SECURE === "true",
+        user: process.env.SMTP_USER || undefined,
+        password: process.env.SMTP_PASS || undefined,
     });
 
-    await transporter.sendMail({
+    await client.sendAsync({
         from,
         to: normalizedRecipients,
         subject,
